@@ -2,9 +2,13 @@
 #'
 #' Downloads NHANES data files needed for exposure inference based on a manually curated file describing which data to use
 #'
-#' @param codes_file
+#' @param codes_file Manually created xls or xlsx file containing 3 sheets:  1. NHANES chemicals to include (with identifier,
+#' code, file, demographic, and units), 2. Associated weights, filenames, and column names associated with each phase used,
+#' and 3. Parent-metabolite map containing chemical identifiers and molecular weights.
 #'
 #' @return
+#' @importFrom gdata read.xls
+#' @importFrom utils download.file
 #' @export
 #'
 #' @examples
