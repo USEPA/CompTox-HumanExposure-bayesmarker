@@ -1,12 +1,15 @@
-
-
-### R script for downloading NHANES data files needed for exposure inference
-
-
-#setwd("C:/Users/zstanfie/OneDrive - Environmental Protection Agency (EPA)/Profile/Documents/NHANES")
-#library(plyr)
-#library(readxl)
-
+#' get_NHANES_data
+#'
+#' Downloads NHANES data files needed for exposure inference based on a manually curated file describing which data to use
+#'
+#' @param codes_file
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#'
+#'
 get_NHANES_data <- function(codes_file = NULL) {
 
   if (is.null(codes_file)){

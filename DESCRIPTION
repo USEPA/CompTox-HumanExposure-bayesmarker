@@ -1,11 +1,11 @@
 Package: bayesmarker
-Title: What the Package Does (One Line, Title Case)
+Title: Estimates Chemical Exposure from Biomarker Data Using Bayesian Inference
 Version: 0.0.0.9000
 Authors@R: 
-    person(given = "First",
-           family = "Last",
+    person(given = "Zachary",
+           family = "Stanfield",
            role = c("aut", "cre"),
-           email = "first.last@example.com",
+           email = "zachary.stanfield@epa.gov",
            comment = c(ORCID = "YOUR-ORCID-ID"))
 Description: What the package does (one paragraph).
 License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
@@ -14,3 +14,18 @@ Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
+Imports: 
+    plyr,
+    readxl,
+    foreign,
+    survey,
+    gdata,
+    splines,
+    parallel,
+    doMC,
+    foreach,
+    rjags,
+    random,
+    MASS,
+    coda,
+    ggplot2
