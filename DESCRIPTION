@@ -26,4 +26,5 @@ Imports:
     random,
     MASS,
     coda,
-    ggplot2
+    ggplot2,
+    methods
