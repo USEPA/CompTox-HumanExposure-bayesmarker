@@ -1439,3 +1439,55 @@ convert.urine.to.exposure <-
     ##      mg/g creatinine      g creatinine / L urine     L urine / day
     return((urine.conc/1000)*(average.creatinine*10/1000)*urine.vol.per.day)
   }
+
+
+
+#' creatinine
+#'
+#' Estimates daily creatinine excretion in mg creatinine/day
+#'
+#' @param newdata A data.frame with individual-specific data including the
+#' following data columns: RIAGENDR, RIDRETH1, BMXWT, RIDAGEYR
+#'
+#' @return Estimated daily creatinine excretion in mg creatinine/day
+#'
+#' @importFrom stats model.matrix predict
+#'
+#' @export
+#'
+#' @examples # daily_creatinine <- creatinine(newdata)
+#'
+creatinine <- function(newdata){
+  X <- cbind(model.matrix(~ 0 + RIAGENDR + RIDRETH1, data=newdata),
+             predict(Wtns, newdata$BMXWT),
+             predict(Agens, newdata$RIDAGEYR))
+  10^(X %*% modparms[-length(modparms)])
+}
+
+
+
+#' rcreatinine
+#'
+#' Similar to creatinine() but adds random noise to the result
+#'
+#' @param newdata A data.frame with individual-specific data including the
+#' following data columns: RIAGENDR, RIDRETH1, BMXWT, RIDAGEYR
+#'
+#' @return Estimated daily creatinine excretion in mg creatinine/day
+#'
+#' @importFrom stats model.matrix predict rt
+#'
+#' @export
+#'
+#' @examples # daily_creatinine <- creatinine(newdata)
+#'
+rcreatinine <- function(newdata){
+  X <- cbind(model.matrix(~ 0 + RIAGENDR + RIDRETH1, data=newdata),
+             predict(Wtns, newdata$BMXWT),
+             predict(Agens, newdata$RIDAGEYR))
+  Y <- X %*% modparms[-length(modparms)]
+  z <- rt(nrow(newdata), df=3.5)
+  10^(Y + z * exp(modparms[length(modparms)]))
+}
+
+
