@@ -32,10 +32,15 @@
 #'
 readNHANES <- function(codes_file, data_path = "rawData") {
 
-
-  datapaths <- structure(file.path(".",data_path,
-                                   c("1999-2000","2001-2002","2003-2004","2007-2008","2009-2010","2011-2012","2013-2014","2015-2016")),
-                         names= c("99-00","01-02","03-04","07-08","09-10","11-12","13-14","15-16"))
+  ## datapaths gives the paths for the NHANES individual .xpt data files.  This
+  ## construct gives a vector of paths, one for each sample set.  We then
+  ## name the files using the shorthand name for each sample set
+  phases <- unique(Measured$recent_sample)
+  ind <- sort(substring(phases, 4, 5), index.return = TRUE)
+  long <- sapply(phases[ind$ix], function(x) ifelse(as.numeric(substring(x, 1, 2)) < 50,
+                                            paste("20", substring(x, 1, 3), "20", substring(x, 4, 5), sep = ""),
+                                            paste("19", substring(x, 1, 3), "20", substring(x, 4, 5), sep = "")))
+  datapaths <- structure(file.path(".","rawData", long), names= names(long))
 
   ## Curated EXCEL spreadsheet giving information about the variables and files used in
   ## this analysis
@@ -232,8 +237,8 @@ readNHANES <- function(codes_file, data_path = "rawData") {
 
   ## -------------------------------------------------------------------------------------------
   ## Outputs
-  print("Saving returned outputs as MCMCdata.RData")
-  save(Measured, pred.data, Uses, mapping, file = "MCMCdata.RData")
+  print(paste("Saving returned outputs as MCMCdata_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
+  save(Measured, pred.data, Uses, mapping, file = paste("MCMCdata_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
   return(Measured, pred.data, Uses, mapping)
 
 }
