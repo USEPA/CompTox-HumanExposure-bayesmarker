@@ -164,6 +164,31 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     scalebycreatinine <- FALSE
   }
 
+  # NHANES suggests scaling creatinine measurements before 2007 using a pairwise
+  # equation to be more comparable.  Do this here.
+  oldmethod <- c("1999-2000", "2001-2002", "2003-2004", "2005-2006")
+  ind <- unlist(sapply(oldmethod, function(x) grep(x, demof)))
+  # scaling function
+  scale_old <- function(z) {
+    if (!is.na(z)) {
+      if (z < 75) {
+        z <- (1.02*sqrt(z) - 0.36)^2
+      } else if (z >= 75 && z < 250) {
+        z <- (1.05*sqrt(z) - 0.74)^2
+      } else {
+        z <- (1.01*sqrt(z) - 0.1)^2
+      }
+    } else {
+      z <- NA
+    }
+    return(z)
+  }
+  # Apply if this phase is in oldmethod
+  if (length(ind) > 0) {
+    cdta[,creatinine] <- sapply(cdta[,creatinine], scale_old)
+  }
+
+
   ##  cat("getNhanesQuantiles, chemvars2: \"", chemvars2, "\"\n")
   if (any(!(XX <- chemvars2 %in% colnames(cdta)))) {
     stop(paste("Variables requested NOT in ",chemdtaf,": ",
