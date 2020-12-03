@@ -1,3 +1,80 @@
+bayes_model <- "
+
+var mixmu[Nn], mixtau[Nn], mixpi[Nn];
+
+data
+{
+## Turning the input standard errors into precisions for the estimated log geometric mean product
+## concentrations
+  for (i in 1:Mn)
+    {
+      tau.se[i] <- 1/(se[i]*se[i])
+    }
+}
+
+model
+{
+  ## +++++++++++++++++++++++++++++++++++++++++++++
+  ## The heart of the model:
+  ## Model the parent exposures
+  ## +++++++++++++++++++++++++++++++++++++++++++++
+  for (i in 1:N) {
+    ## log of product of production volume and unit exposure
+    lP[i] ~ dnorm(lPmu, tau.V)
+    P[i]<- exp(lP[i])
+  }
+  ## hyperparameter for lP
+  lPmu ~ dnorm(0, 0.001)
+
+  ## code so that prior for sd(log(P[i])) is half-Cauchy(25)
+  sd.dum ~ dt(0,1/625,1)
+  sd.V <- abs(sd.dum)
+  tau.V <- 1/pow(sd.V,2)
+  ## ++++++++++++++++++++++++++++++++++++++++++++++
+  ## Link the unobserved parent exposure to the observed
+  ## (but censored) metabolite (w/some parent) urinary
+  ## values.
+  ##
+  ## Model metabolite concentrations as (usually) unknown fractions
+  ## of the parent.
+  ##
+  ## Phi[i,j] say what fraction of parent[i] goes to metabolite[j]
+  ## observed values are lognormally distributed around U, with known
+  ## precision, but censored.  Some of the elements of Phi are known to be
+  ## 0 or 1 (thanks to Jim Rabinowitz for some of the 1's).
+  lU <- log(t(Phi) %*% P)
+  ## tau.se <- 1/(se * se)
+  for (j in 1:Mn) {
+    ly[j] ~ dnorm(lU[j],tau.se[j])
+  }
+  ## for j > Mn, what we have is the number of observations > LOD, and the total sample size.
+  ## so let Pralod[j]  <-  1 - pnorm(lu[j], sd[j - Mn])
+  ## Then ly[j]  <-  number above lod, and is binomial with mean Pralod[j] and n SS[j]
+  for (j in (Mn+1):M) {
+    Pralod[j - Mn] <- 1 - pnorm(lod[j - Mn], lU[j], tau[j - Mn])
+    ly[j] ~ dbin(Pralod[j - Mn], SS[j - Mn])
+  }
+  ## The population lsds look to be mixtures of normal distributions for the data
+  ## where moments seem well-estimated.
+  ## Estimate mixmu, mixtau, mixpi externally, and input as data.
+  for (j in 1:(M - Mn)) {
+    lsd[j] ~ dnormmix(mixmu, mixtau, mixpi)
+    tau[j]  <- exp(-2*lsd[j])
+  }
+
+  for (i in 1:NBranches)
+  {
+    phi[Bstart[i]:Bstop[i]] ~ ddirch(Alpha[Bstart[i]:Bstop[i]])
+  }
+
+  for (i in 1:Ndelta) {
+    Phi[indx[i,1],indx[i,2]] <- phi[i]
+  }
+
+}
+"
+
+
 #' fitOnlyP
 #'
 #' Runs Bayesian inference for a provided subpopulation
@@ -330,7 +407,7 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
       Phi[indx[i,1],indx[i,2]] <- phi[i]
     }
 
-    model.jags <- jags.model(file = "./OnlyP/OnlyP.jag", data=nhanesdata, inits=doinits,
+    model.jags <- jags.model(bayes_model, data=nhanesdata, inits=doinits,
                              n.chains=1,n.adapt=N.Burnin)
 
     out.samples <- coda.samples(model.jags,
@@ -409,7 +486,7 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
 
   print("Start main computation")
   out.samps3R <- foreach(i = 1:3) %dopar% {
-    model <- jags.model(file.path("./OnlyP/OnlyP.jag"), data=nhanesdata,
+    model <- jags.model(bayes_model, data=nhanesdata,
                         inits=inits2[i], n.chains=1, n.adapt=NBurnin)
     result <- coda.samples(model, variable.names=c("lP","phi","lU","lPmu","sd.V"),
                            n.iter=NIters*Thin, thin=Thin)
@@ -420,7 +497,7 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
 
   print(paste("Save final result in the file OnlyPparms3_", SUBPOP, "_",
               format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  save(out.samps3R, out.coda3R, file=paste("./updatedPipeline/OnlyPparms3_", SUBPOP, "_",
+  save(out.samps3R, out.coda3R, file=paste("OnlyPparms3_", SUBPOP, "_",
                                            format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
   return(out.samps3R, out.coda3R)
 
