@@ -99,6 +99,9 @@ model
 #'
 #' @return out.samps3R
 #'         out.coda3R
+#'         nhanesdata: a list containing all the data needed to run the jags model.
+#'                     Used as input to the fromMolar function to assign chemical
+#'                     information to the final estimates.
 #'
 #' @export
 #'
@@ -499,7 +502,7 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
               format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
   save(out.samps3R, out.coda3R, file=paste("OnlyPparms3_", SUBPOP, "_",
                                            format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  return(out.samps3R, out.coda3R)
+  return(out.samps3R, out.coda3R, nhanesdata)
 
 }
 

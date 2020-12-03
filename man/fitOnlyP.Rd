@@ -25,6 +25,9 @@ model convergence may not be reached.  Check convergence using the fromMolar fun
 \value{
 out.samps3R
 out.coda3R
+nhanesdata: a list containing all the data needed to run the jags model.
+Used as input to the fromMolar function to assign chemical
+information to the final estimates.
 }
 \description{
 Runs Bayesian inference for a provided subpopulation
