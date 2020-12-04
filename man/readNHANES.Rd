@@ -4,7 +4,7 @@
 \alias{readNHANES}
 \title{readNHANES}
 \usage{
-readNHANES(codes_file, data_path = "rawData")
+readNHANES(codes_file, data_path = NULL, save_directory = ".")
 }
 \arguments{
 \item{codes_file}{Manually created xls or xlsx file containing 3 sheets:  1. NHANES
@@ -12,9 +12,13 @@ chemicals to include (with identifier, code, file, demographic, and units),
 2. Associated weights, filenames, and column names associated with each phase used,
 and 3. Parent-metabolite map containing chemical identifiers and molecular weights.}
 
-\item{data_path}{String providing the path to the raw data.  Default is "rawData",
-the direct output from running get_NHANES_data would be "rawData", resulting
-in e.g. ./rawData/1999-2000}
+\item{data_path}{String providing the path to the raw data.  Is "rawData",
+the direct output from running get_NHANES_data would be "rawData", if left NULL, resulting
+in e.g. ./rawData/1999-2000  If the directory is a subdirectory of your working one,
+include "./" (e.g. "./test" will look in "./test/rawData")}
+
+\item{save_directory}{String providing the directory in which to save the NHANES data files.  If left as the default,
+NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.}
 }
 \value{
 Measured: a data frame containing a row for each metabolite with columns

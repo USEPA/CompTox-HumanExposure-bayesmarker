@@ -88,6 +88,9 @@ model
 #' with less iterations, resulting in a shorter overall runtime, however,
 #' model convergence may not be reached.  Check convergence using the fromMolar function.
 #' @param cores Number of cores to use during computation
+#' @param save_directory String providing the directory in which to save the results.  If
+#'                       left as the default, ".", it will save to ./OnlyPparms3_SUBPOP.RData
+#'                       with a date stamp.  Otherwise, it will save to save_directory.
 #'
 #' @import doMC
 #' @import foreach
@@ -106,7 +109,7 @@ model
 #' @export
 #'
 #'
-fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores = 3) {
+fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores = 3, save_directory = ".") {
 
   registerDoMC(cores=cores)
   load.module("lecuyer")
@@ -500,9 +503,12 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
 
   print(paste("Save final result in the file OnlyPparms3_", SUBPOP, "_",
               format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  save(out.samps3R, out.coda3R, file=paste("OnlyPparms3_", SUBPOP, "_",
-                                           format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  return(out.samps3R, out.coda3R, nhanesdata)
+  save(out.samps3R, out.coda3R, file=file.path(save_directory, paste("OnlyPparms3_", SUBPOP, "_",
+                                           format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
+  output <- list(out.samps3R = out.samps3R,
+                 out.coda3R = out.coda3R,
+                 nhanesdata = nhanesdata)
+  return(output)
 
 }
 

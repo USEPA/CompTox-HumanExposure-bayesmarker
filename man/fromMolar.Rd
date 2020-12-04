@@ -4,7 +4,15 @@
 \alias{fromMolar}
 \title{fromMolar}
 \usage{
-fromMolar(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplot = TRUE)
+fromMolar(
+  SUBPOP,
+  Measured,
+  pred.data,
+  nhanesdata,
+  out.coda3R,
+  doplot = TRUE,
+  save_directory = "."
+)
 }
 \arguments{
 \item{SUBPOP}{The subpopulation name for which we want to look at convergence}
@@ -23,6 +31,8 @@ information to the final estimates.}
 
 \item{doplot}{Logical input to indicate whether a plot should be generated and saved.
 Default is TRUE.}
+
+\item{save_directory}{String specifying the directory in which to save the plot and results.}
 }
 \value{
 lPsampsgm: data frame whose rows are the parent chemicals, columns are
@@ -32,6 +42,7 @@ subpopulation.
 Measured: same as the input to fitOnlyP, reduced to rows matching the
 input subpopulation. Geometric means of the metabolites that
 are created from the parents in lPsampsgm.
+Plot: ggplot result of comparison of metabolite estimates. View with print(Plot).
 }
 \description{
 This is generic code for checking the results of the MCMC analyses of

@@ -4,7 +4,13 @@
 \alias{plot_subpops}
 \title{plot_subpops}
 \usage{
-plot_subpops(path_to_lPs = NULL, SUBPOP = "all")
+plot_subpops(
+  path_to_lPs = NULL,
+  SUBPOP = "all",
+  save_output = FALSE,
+  save_directory = ".",
+  print_plot = FALSE
+)
 }
 \arguments{
 \item{path_to_lPs}{String representing the location of the lPsamps outputs.
@@ -13,15 +19,22 @@ be within the directory provided.}
 
 \item{SUBPOP}{A character vector of the subpopulations to be plotted.  These
 must exactly match the subpopulations contained in the original
-codes_file.
-#@param save_location String giving the path of where to save the output tableand plot.
+codes_file.}
 
-#@param save_output Logical indicating if plot should be saved.}
+\item{save_output}{Set to TRUE to save the results. Note that the default
+save location is the current working directory.}
+
+\item{save_directory}{String giving the path of where to save the output table
+and plot.}
+
+\item{print_plot}{Boolean input. Default is FALSE. Set to TRUE to plot in the
+current R session.}
 }
 \value{
 exposureDF:  data.frame with rows representing the chemicals and columns
 representing the different subpopulations
-p:  The resulting plot
+Plot: The plot is printed for viewing, but you can choose where to save
+it or view it again using print(p)
 }
 \description{
 Plot the median exposure estimate for all subpopulations of each parent

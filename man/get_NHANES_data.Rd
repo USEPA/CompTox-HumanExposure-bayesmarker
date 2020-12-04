@@ -4,18 +4,27 @@
 \alias{get_NHANES_data}
 \title{get_NHANES_data}
 \usage{
-get_NHANES_data(codes_file = NULL)
+get_NHANES_data(codes_file = NULL, save_directory = NULL)
 }
 \arguments{
 \item{codes_file}{Manually created xls or xlsx file containing 3 sheets:  1. NHANES chemicals to include (with identifier,
 code, file, demographic, and units), 2. Associated weights, filenames, and column names associated with each phase used,
 and 3. Parent-metabolite map containing chemical identifiers and molecular weights.}
+
+\item{save_directory}{String providing the directory in which to save the NHANES data files.  If left as the default,
+NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.}
 }
 \value{
 
 }
 \description{
-Downloads NHANES data files needed for exposure inference based on a manually curated file describing which data to use
+Downloads NHANES data files needed for exposure inference based on a manually curated file describing which data to use.
+Note that accuracy is very important for the input codes file. After "Starting Downloads" is printed to the console by
+this function, no errors or warnings should be seen. Common issues when downloading the files are having incorrect
+spelling of the file names (e.g. dem.xtpt instead of demo.xpt) and having the wrong phase and extension pair (e.g. 2015
+\itemize{
+\item 2016 files end in "_I.XPT"; will fail if this is "_F.XPT").
+}
 }
 \examples{
 

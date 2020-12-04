@@ -9,9 +9,12 @@
 #' chemicals to include (with identifier, code, file, demographic, and units),
 #' 2. Associated weights, filenames, and column names associated with each phase used,
 #' and 3. Parent-metabolite map containing chemical identifiers and molecular weights.
-#' @param data_path String providing the path to the raw data.  Default is "rawData",
-#' the direct output from running get_NHANES_data would be "rawData", resulting
-#' in e.g. ./rawData/1999-2000
+#' @param data_path String providing the path to the raw data.  Is "rawData",
+#' the direct output from running get_NHANES_data would be "rawData", if left NULL, resulting
+#' in e.g. ./rawData/1999-2000  If the directory is a subdirectory of your working one,
+#' include "./" (e.g. "./test" will look in "./test/rawData")
+#' @param save_directory String providing the directory in which to save the NHANES data files.  If left as the default,
+#'                       NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.
 #'
 #' @importFrom gdata read.xls
 #' @importFrom parallel mclapply
@@ -30,17 +33,7 @@
 #'
 #' @examples # readNHANES("NHANEScodes.xlsx", "rawData")
 #'
-readNHANES <- function(codes_file, data_path = "rawData") {
-
-  ## datapaths gives the paths for the NHANES individual .xpt data files.  This
-  ## construct gives a vector of paths, one for each sample set.  We then
-  ## name the files using the shorthand name for each sample set
-  phases <- unique(Measured$recent_sample)
-  ind <- sort(substring(phases, 4, 5), index.return = TRUE)
-  long <- sapply(phases[ind$ix], function(x) ifelse(as.numeric(substring(x, 1, 2)) < 50,
-                                            paste("20", substring(x, 1, 3), "20", substring(x, 4, 5), sep = ""),
-                                            paste("19", substring(x, 1, 3), "20", substring(x, 4, 5), sep = "")))
-  datapaths <- structure(file.path(".","rawData", long), names= names(long))
+readNHANES <- function(codes_file, data_path = NULL, save_directory = ".") {
 
   ## Curated EXCEL spreadsheet giving information about the variables and files used in
   ## this analysis
@@ -58,21 +51,34 @@ readNHANES <- function(codes_file, data_path = "rawData") {
 
   ## convtbl was constructed manually, starting with an earlier list of NHANES urine
   ## products. Age cutoffs were based on the highest age group reported in the 4th report.
-
   convtbl <- read.xls(NHANEScodes, as.is = TRUE)
   wtvars <- read.xls(NHANEScodes, sheet = 2, as.is = TRUE)
 
   #### Data checks
   print("Checking input codes file")
   if (any(convtbl$CAS == "")){
+    missing <- sum(convtbl$CAS == "")
     convtbl <- convtbl[!(convtbl$CAS == ""),]
-    print(paste("Warning:  removed ", as.character(sum(convtbl$CAS == "")), "rows due to missing CAS"), sep = "")
+    print(paste("Warning:  removed ", missing, " rows due to missing CAS"), sep = "")
   }
   if (any(duplicated(convtbl$CAS))) {
     print("Error:  duplicate chemical identifiers, each row must have a unique identifier.")
     stop()
   }
 
+  ## datapaths gives the paths for the NHANES individual .xpt data files.  This
+  ## construct gives a vector of paths, one for each sample set.  We then
+  ## name the files using the shorthand name for each sample set
+  phases <- unique(convtbl$recent_sample)
+  ind <- sort(substring(phases, 4, 5), index.return = TRUE)
+  long <- sapply(phases[ind$ix], function(x) ifelse(as.numeric(substring(x, 1, 2)) < 50,
+                                                    paste("20", substring(x, 1, 3), "20", substring(x, 4, 5), sep = ""),
+                                                    paste("19", substring(x, 1, 3), "20", substring(x, 4, 5), sep = "")))
+  if (is.null(data_path)){
+    datapaths <- structure(file.path(".","rawData", long), names= names(long))
+  } else {
+    datapaths <- structure(file.path(data_path,"rawData", long), names= names(long))
+  }
 
   ## First, run through all the input files and estimate quantiles.
   demofiles <- wtvars$demofile
@@ -101,7 +107,7 @@ readNHANES <- function(codes_file, data_path = "rawData") {
   chemwt <- wtvars$wtvariable
   names(chemwt) <- wtvars$file
 
-
+  print("Starting geometric mean estimations")
   scaledata <-
     mclapply(1:length(datafiles),
              FUN=function(i) {
@@ -121,6 +127,7 @@ readNHANES <- function(codes_file, data_path = "rawData") {
 
   scalequants <- do.call("rbind", scaledata)
 
+  print("Complete.  Constructing Measured.")
 
   #######
   ## Build an object for the urine products with
@@ -158,7 +165,8 @@ readNHANES <- function(codes_file, data_path = "rawData") {
   z <- unique(Measured[is.na(Measured$recent_sample),c(1,2)])
   print(paste("Warning:  ", dim(z)[1], " have measurement data but are missing a parent.
               Chemical identifiers for these metabolites were saved in the file ChemsWithoutParents.csv", sep = ""))
-  write.csv(z, file = paste("ChemsWithoutParent_", format(Sys.time(), "%Y-%m-%d"), ".csv", sep = ""), row.names = FALSE)
+  write.csv(z, file = file.path(save_directory, paste("ChemsWithoutParent_", format(Sys.time(), "%Y-%m-%d"),
+                                                      ".csv", sep = "")), row.names = FALSE)
   Measured <- Measured[!is.na(Measured$recent_sample),]
   #######
   nms <- names(Measured)
@@ -238,7 +246,12 @@ readNHANES <- function(codes_file, data_path = "rawData") {
   ## -------------------------------------------------------------------------------------------
   ## Outputs
   print(paste("Saving returned outputs as MCMCdata_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  save(Measured, pred.data, Uses, mapping, file = paste("MCMCdata_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  return(Measured, pred.data, Uses, mapping)
+  save(Measured, pred.data, Uses, mapping,
+       file = file.path(save_directory, paste("MCMCdata_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
+  result <- list(Measured = Measured,
+                 pred.data = pred.data,
+                 Uses = Uses,
+                 mapping = mapping)
+  return(result)
 
 }

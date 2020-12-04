@@ -4,7 +4,15 @@
 \alias{fitOnlyP}
 \title{fitOnlyP}
 \usage{
-fitOnlyP(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores = 3)
+fitOnlyP(
+  SUBPOP,
+  Measured,
+  mapping,
+  pred.data,
+  quick = FALSE,
+  cores = 3,
+  save_directory = "."
+)
 }
 \arguments{
 \item{SUBPOP}{The subpopulation name for which we run the inference}
@@ -21,6 +29,10 @@ with less iterations, resulting in a shorter overall runtime, however,
 model convergence may not be reached.  Check convergence using the fromMolar function.}
 
 \item{cores}{Number of cores to use during computation}
+
+\item{save_directory}{String providing the directory in which to save the results.  If
+left as the default, ".", it will save to ./OnlyPparms3_SUBPOP.RData
+with a date stamp.  Otherwise, it will save to save_directory.}
 }
 \value{
 out.samps3R

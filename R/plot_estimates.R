@@ -10,13 +10,17 @@
 #' @param SUBPOP A character vector of the subpopulations to be plotted.  These
 #'               must exactly match the subpopulations contained in the original
 #'               codes_file.
-#' #@param save_location String giving the path of where to save the output table
-#'#                      and plot.
-#' #@param save_output Logical indicating if plot should be saved.
+#' @param save_output Set to TRUE to save the results. Note that the default
+#'                    save location is the current working directory.
+#' @param save_directory String giving the path of where to save the output table
+#'                       and plot.
+#' @param print_plot Boolean input. Default is FALSE. Set to TRUE to plot in the
+#'                   current R session.
 #'
 #' @return exposureDF:  data.frame with rows representing the chemicals and columns
 #'                      representing the different subpopulations
-#'         p:  The resulting plot
+#'         Plot: The plot is printed for viewing, but you can choose where to save
+#'               it or view it again using print(p)
 #'
 #' @import ggplot2
 #' @importFrom reshape2 melt
@@ -24,7 +28,7 @@
 #' @export
 #'
 #'
-plot_subpops <- function(path_to_lPs = NULL, SUBPOP = "all") {  #, save_location = NULL, save_plot = FALSE) {
+plot_subpops <- function(path_to_lPs = NULL, SUBPOP = "all", save_output = FALSE, save_directory = ".", print_plot = FALSE) {
 
   # Reference for population groups
   subpops <- c("Total", "Male", "Female", "0 - 5", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
@@ -87,11 +91,19 @@ plot_subpops <- function(path_to_lPs = NULL, SUBPOP = "all") {  #, save_location
     theme_set(theme_gray(base_size = 18)) +
     theme(axis.text.x=element_text(angle=90, hjust=1))
 
-  #pdf("CompSubpopEsts_mgkgday_sorted.pdf", width=24, height=8)#, units="in", res=600)
-  print(p)
-  #dev.off()
+  if (print_plot) {
+    print(p)
+  }
 
-  return(exposureDF, p)
+  result <- list(exposureDF = exposureDF,
+                 Plot = p)
+
+  if (save_output) {
+    save(result, file=file.path(save_directory, paste("CompareSubpops_", SUBPOP, "_",
+                                      format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
+  }
+
+  return(result)
 
 }
 

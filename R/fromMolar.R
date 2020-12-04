@@ -22,6 +22,7 @@
 #' @param out.coda3R Output from fitOnlyP. A MCMC list object.
 #' @param doplot Logical input to indicate whether a plot should be generated and saved.
 #'               Default is TRUE.
+#' @param save_directory String specifying the directory in which to save the plot and results.
 #'
 #'
 #' @import ggplot2
@@ -35,10 +36,11 @@
 #'         Measured: same as the input to fitOnlyP, reduced to rows matching the
 #'                   input subpopulation. Geometric means of the metabolites that
 #'                   are created from the parents in lPsampsgm.
+#'         Plot: ggplot result of comparison of metabolite estimates. View with print(Plot).
 #'
 #' @export
 #'
-fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplot = TRUE) {
+fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplot = TRUE, save_directory = ".") {
 
   ## Take samples of lP from OnlyP, convert to a matrix, and convert from
   ## nmoles/kg bodyweight/day to mg/kg bodyweight/day
@@ -107,7 +109,8 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
       scale_y_continuous("Estimated lU", limits=c(-7.5,2.5)) +
       scale_x_continuous("Measurement from NHANES", limits=c(-40,5)) +
       ggtitle("Excretion Rates for Urinary Metabolites")
-    pdf(file=paste("MetabComparison_", SUBPOP, "_", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep=""))
+    pdf(file = file.path(save_directory, paste("MetabComparison_", SUBPOP, "_",
+                                               format(Sys.time(), "%Y-%m-%d"), ".pdf", sep="")))
     print(p)
     dev.off()
   }
@@ -128,10 +131,12 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
 
   row.names(lPsampsgm) <- pred.data$CAS
 
-  save(lPsampsgm, Measured, file=paste("lPsamps-gm_kg_day_", SUBPOP, "_",
-                                                  format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-
-  return(lPsampsgm, Measured)
+  save(lPsampsgm, Measured, file=file.path(save_directory, paste("lPsamps-gm_kg_day_", SUBPOP, "_",
+                                                  format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
+  lPsamps <- list(lPsampsgm = lPsampsgm,
+                  Measured = Measured,
+                  plot = p)
+  return(lPsamps)
 
 }
 
