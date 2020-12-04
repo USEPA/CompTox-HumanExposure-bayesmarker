@@ -29,6 +29,7 @@ Imports:
     ggplot2,
     methods,
     logspline,
-    nor1mix
+    nor1mix,
+    reshape2
 Depends: 
     R (>= 2.10)

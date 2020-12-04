@@ -35,8 +35,6 @@
 #'         Measured: same as the input to fitOnlyP, reduced to rows matching the
 #'                   input subpopulation. Geometric means of the metabolites that
 #'                   are created from the parents in lPsampsgm.
-#'         pred.data: subset of the input of the same name for the chemicals there
-#'                    are exposure estimates for
 #'
 #' @export
 #'
@@ -128,10 +126,12 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
 
   lPsampsgm <- sweep(lPsampsmo, 2 ,adjust,"+")
 
-  save(lPsampsgm, Measured, pred.data, file=paste("lPsamps-gm_kg_day_", SUBPOP, "_",
+  row.names(lPsampsgm) <- pred.data$CAS
+
+  save(lPsampsgm, Measured, file=paste("lPsamps-gm_kg_day_", SUBPOP, "_",
                                                   format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
 
-  return(lPsampsgm, Measured, pred.data)
+  return(lPsampsgm, Measured)
 
 }
 

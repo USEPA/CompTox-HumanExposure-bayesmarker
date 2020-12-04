@@ -16,7 +16,3 @@ Estimated daily creatinine excretion in mg creatinine/day
 \description{
 Similar to creatinine() but adds random noise to the result
 }
-\examples{
-# daily_creatinine <- creatinine(newdata)
-
-}

@@ -942,7 +942,7 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     indx <- match(c("loggm","loggm_se","lsdlog","lsdlog_se"), colnames(qout))
     qout <- qout[,-indx]
   }
-  qout
+  return(qout)
 }
 
 
@@ -1285,7 +1285,7 @@ getDesign <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", measureta
   # na.omit(svydesign(id=make.formula(PSU), strata=make.formula(STRA),
   #                           weights=make.formula(chem2yrwt), nest=TRUE, data=ndta))
 
-  design
+  return(design)
 
 }
 
@@ -1307,7 +1307,7 @@ getDesign <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", measureta
 #' @return lognormal distribution with left censoring fit to the inputs
 #' @export
 #'
-#' @examples
+#'
 lnlike <- function(x, mean, lsd)
 {
   sd <- exp(lsd) + .Machine$double.eps
@@ -1480,13 +1480,12 @@ convert.urine.to.exposure <-
 #'
 #' @export
 #'
-#' @examples # daily_creatinine <- creatinine(newdata)
 #'
 creatinine <- function(newdata){
   X <- cbind(model.matrix(~ 0 + RIAGENDR + RIDRETH1, data=newdata),
              predict(Wtns, newdata$BMXWT),
              predict(Agens, newdata$RIDAGEYR))
-  10^(X %*% modparms[-length(modparms)])
+  return(10^(X %*% modparms[-length(modparms)]))
 }
 
 
@@ -1504,7 +1503,6 @@ creatinine <- function(newdata){
 #'
 #' @export
 #'
-#' @examples # daily_creatinine <- creatinine(newdata)
 #'
 rcreatinine <- function(newdata){
   X <- cbind(model.matrix(~ 0 + RIAGENDR + RIDRETH1, data=newdata),
@@ -1512,7 +1510,7 @@ rcreatinine <- function(newdata){
              predict(Agens, newdata$RIDAGEYR))
   Y <- X %*% modparms[-length(modparms)]
   z <- rt(nrow(newdata), df=3.5)
-  10^(Y + z * exp(modparms[length(modparms)]))
+  return(10^(Y + z * exp(modparms[length(modparms)])))
 }
 
 

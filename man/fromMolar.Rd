@@ -32,8 +32,6 @@ subpopulation.
 Measured: same as the input to fitOnlyP, reduced to rows matching the
 input subpopulation. Geometric means of the metabolites that
 are created from the parents in lPsampsgm.
-pred.data: subset of the input of the same name for the chemicals there
-are exposure estimates for
 }
 \description{
 This is generic code for checking the results of the MCMC analyses of
