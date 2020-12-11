@@ -1,11 +1,12 @@
+
 bayes_model <- "
 
 var mixmu[Nn], mixtau[Nn], mixpi[Nn];
 
 data
 {
-## Turning the input standard errors into precisions for the estimated log geometric mean product
-## concentrations
+# Turning the input standard errors into precisions for the estimated log geometric mean product
+# concentrations
   for (i in 1:Mn)
     {
       tau.se[i] <- 1/(se[i]*se[i])
@@ -74,7 +75,6 @@ model
 }
 "
 
-
 #' fitOnlyP
 #'
 #' Runs Bayesian inference for a provided subpopulation
@@ -98,7 +98,7 @@ model
 #' @import random
 #' @import MASS
 #' @import nor1mix
-#' @importFrom coda varnames
+#' @importFrom coda varnames mcmc.list
 #'
 #' @return out.samps3R
 #'         out.coda3R
@@ -111,7 +111,8 @@ model
 #'
 fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores = 3, save_directory = ".") {
 
-  registerDoMC(cores=cores)
+  system(paste("echo 'now processing:",SUBPOP,"'"))
+
   load.module("lecuyer")
   load.module("mix")
   doONEchain <- TRUE
@@ -142,7 +143,6 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
   ##   delta[1:Ndelta]: the non-trivial deltas corresponding to the non-trivial phis
 
   ## Data are based on John W.'s RData file DataTables-040212.RData, and successors.
-
   Measured <- subset(Measured, subpop == SUBPOP)
   M <- nrow(Measured)
   Mn <- sum(Measured$PosteriorShape == "normal")
@@ -153,8 +153,9 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
 
   ## Drop entries for metabolites we won't be following: Drop CAS.1 that are NOT in Measured$CAS
   indx <- which(!(mapping$CAS.1 %in% unique(Measured$CAS)))
-  if (length(indx) > 0)
+  if (length(indx) > 0) {
     mapping <- mapping[-indx,]
+  }
 
   ## Sort this on CAS and Branch
   indx <- order(mapping$CAS, mapping$Branch)
@@ -180,10 +181,13 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
   ## to NA.  Some of these will be reset to 1,
   ## and the directly observed parents.  These are the CAS numbers in pred.data that
   ## are also in NHANES.
+  #print("Check 2 passed")
   Xref <- matrix(0, nrow=nrow(pred.data), ncol=length(unique(Measured$CAS)),
                  dimnames=list(pred.data$CAS, unique(Measured$CAS)))
+  #print("Check 2.1 passed")
   indx <- cbind(match(mapping$CAS,rownames(Xref)),
                 match(mapping$CAS.1,colnames(Xref)))
+  #print("Check 2.2 passed")
   Xref[indx] <- NA
 
   Brnch <- by(mapping, mapping$CAS,
@@ -195,9 +199,8 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
   ## Brnch has an element for each row in Xref.  Each element has an element for each branch.
   ## Each branch with only one element corresponds to a 1 in Xref.  Each branch with multiple elements
   ## corresponds to that many rows in F with 1's in the columns corresponding to the multiple elements.
-
-  for(pname in names(Brnch))
-  {
+  #print("Check 2.3 passed")
+  for(pname in names(Brnch)){
     zz <- Brnch[[pname]]
     for (brn in names(zz))
     {
@@ -209,11 +212,11 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
     }
     if (length(Brnch[[pname]]) == 0) Brnch[pname] <- NULL
   }
-
+  #print("Check 2.4 passed")
   ## The remaining NAs in Xref correspond to deltas that need to be estimated.
   ## Let Ndeltas be the number of deltas:
   Ndelta <- sum(is.na(Xref))
-
+  #print("Check 2.5 passed")
   ## index[i,1], index[i,2] gives the row and column indices into Xref of the
   ## ith delta (or phi).  Make sure the rows and columns of Xref don't change
   ## order after index is created, and that the order of rows in Measured and
@@ -222,10 +225,14 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
   ## Resort Measured so that the normal posteriors come first, then
   ## the uniform ones.  Break ties by sorting on CAS
   indx <- order(Measured$PosteriorShape, Measured$CAS)
+  #print("Check 2.6 passed")
   Measured <- Measured[indx,]
   ## Now, reorder the columns of Phi
+  #print("Check 2.7 passed")
   Xref <- Xref[,Measured$CAS]
+  #print("Check 2.8 passed")
   pred.data <- pred.data[rownames(Xref),]
+
 
   ## Now, loop through Brnch, fill index, and set up F
   index <- matrix(0,nrow=Ndelta, ncol=2)
@@ -394,6 +401,7 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
 
     ## Now, run for 50000 samples, thinned every 100, and dump lP, lU, and delta
     ## as well.  We will use these to get starting values for three new chains.
+    DEBUGGING <- quick
     if (DEBUGGING)
     {
       N.Iters <- 2000
@@ -413,8 +421,8 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
       Phi[indx[i,1],indx[i,2]] <- phi[i]
     }
 
-    model.jags <- jags.model(bayes_model, data=nhanesdata, inits=doinits,
-                             n.chains=1,n.adapt=N.Burnin)
+    model.jags <- jags.model(textConnection(bayes_model), data=nhanesdata, inits=doinits,
+                             n.chains=1, n.adapt=N.Burnin)
 
     out.samples <- coda.samples(model.jags,
                                 variable.names=c("lP","phi","lU","lPmu","sd.V"),
@@ -491,8 +499,9 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
   }
 
   print("Start main computation")
+  registerDoMC(cores = cores)
   out.samps3R <- foreach(i = 1:3) %dopar% {
-    model <- jags.model(bayes_model, data=nhanesdata,
+    model <- jags.model(textConnection(bayes_model), data=nhanesdata,
                         inits=inits2[i], n.chains=1, n.adapt=NBurnin)
     result <- coda.samples(model, variable.names=c("lP","phi","lU","lPmu","sd.V"),
                            n.iter=NIters*Thin, thin=Thin)
@@ -501,13 +510,14 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
 
   out.coda3R <- do.call("mcmc.list", lapply(out.samps3R, function(z) z[[1]]))
 
-  print(paste("Save final result in the file OnlyPparms3_", SUBPOP, "_",
-              format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  save(out.samps3R, out.coda3R, file=file.path(save_directory, paste("OnlyPparms3_", SUBPOP, "_",
-                                           format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   output <- list(out.samps3R = out.samps3R,
                  out.coda3R = out.coda3R,
                  nhanesdata = nhanesdata)
+
+  print(paste("Save final result in the file OnlyPparms3_", SUBPOP, "_",
+              format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
+  save(output, file=file.path(save_directory, paste("OnlyPparms3_", SUBPOP, "_",
+                                format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   return(output)
 
 }

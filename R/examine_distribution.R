@@ -10,18 +10,20 @@
 #'                   chemicals to include (with identifier, code, file, demographic, and units),
 #'                   2. Associated weights, filenames, and column names associated with each phase used,
 #'                   and 3. Parent-metabolite map containing chemical identifiers and molecular weights.
-#' @param data_path String providing the path to the raw data.  Default is "rawData",
+#' @param data_path String providing the path to the raw data.  Default is ".",
 #'                  the direct output from running get_NHANES_data would be "rawData", resulting
-#'                  in e.g. ./rawData/1999-2000
-#'
+#'                  in e.g. ./rawData/1999-2000.
+#' @param save_directory String giving the path of where to save the output table
+#'                  and plot.
 #'
 #' @import survey
 #' @import ggplot2
 #' @import logspline
+#' @import foreach
 #' @importFrom parallel mclapply
 #' @importFrom stats vcov
 #' @importFrom gdata read.xls
-#'
+#' @importFrom doMC registerDoMC
 #'
 #' @return Measured: same as the input, but with 4 additional columns.
 #'                   1. Prabove: fraction of measurements above the LOD.
@@ -34,12 +36,12 @@
 #'
 #'
 #'
-examine_error <- function(Measured, codes_file, data_path = "rawData") {
+examine_error <- function(Measured, codes_file, data_path = ".", save_directory = ".") {
 
   nms <- unique(Measured$subpop)
 
   ## Look at the distribution of loggm_se
-  pdf(file="dists_loggm_se.pdf")
+  pdf(file = file.path(save_directory, paste("dists_loggm_se_", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = "")))
   for (nm in nms) {
     print(nm)
     tdta <- Measured[Measured$subpop == nm,]
@@ -75,7 +77,7 @@ examine_error <- function(Measured, codes_file, data_path = "rawData") {
   long <- sapply(phases[ind$ix], function(x) ifelse(as.numeric(substring(x, 1, 2)) < 50,
                                                     paste("20", substring(x, 1, 3), "20", substring(x, 4, 5), sep = ""),
                                                     paste("19", substring(x, 1, 3), "20", substring(x, 4, 5), sep = "")))
-  datapaths <- structure(file.path(".","rawData", long), names= names(long))
+  datapaths <- structure(file.path(data_path, "rawData", long), names= names(long))
 
 
   ## EXCEL spreadsheet giving information about the variables and files used in
@@ -108,13 +110,8 @@ examine_error <- function(Measured, codes_file, data_path = "rawData") {
   chemwt <- wtvars$wtvariable
   names(chemwt) <- tolower(wtvars$file)
 
-  ### Other inputs
-  lunitscale <- log(c("ug/L" = 1.0,"ng/mL" = 1.0,"ng/L" = 0.001, "pg/mL" = 0.001))
-  measurehead <- "URX"
-  lodindhd <- "URD"
-  lodtail <- "LC"
-
   # Check to see if any chemicals use units we haven't accounted for
+  lunitscale <- log(c("ug/L" = 1.0,"ng/mL" = 1.0,"ng/L" = 0.001, "pg/mL" = 0.001))
   tmp <- setdiff(unique(Measured$units), names(lunitscale))
   if (length(tmp) > 0) {
     print("Error:  incorrect units (must be either ug/L, ng/mL, ng/L, or pg/mL")
@@ -129,7 +126,14 @@ examine_error <- function(Measured, codes_file, data_path = "rawData") {
 
   J <- 1:nrow(Measured)
 
-  outplots <- mclapply(J, doplots, dsgn=Measured, mc.preschedule=TRUE, mc.cores=10)
+  #outplots <- mclapply(J, doplots, dsgn=Measured, mc.preschedule=TRUE, mc.cores=11)
+
+  registerDoMC(cores = 10)
+  outplots <- foreach(i = J) %dopar% {
+    tmp <- doplots(i, dsgn = Measured, demofiles, datafiles, chemwt, bwtfiles, creatfiles)
+    return(tmp)
+  }
+
   Rightseg <- sapply(outplots, function(z) z$Rightseg)
   Measured$Rightseg <- c(Rightseg, numeric(nrow(Measured) - length(J)))
   Leftseg <- sapply(outplots, function(z) z$Leftseg)
@@ -147,7 +151,8 @@ examine_error <- function(Measured, codes_file, data_path = "rawData") {
               format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = ""))
   p <- ggplot(data=Asymerrordata, aes(x=LeftRightRatio, y=se.robust, size=Prabove, color=AboveLOD)) +
     geom_point() + scale_x_log10("Left:Right Ratio") + scale_y_log10("Robust SE") + geom_vline(xintercept=2)
-  pdf(paste("leftrightratioplot", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = ""), width = 10, height = 10)
+  pdf(file.path(save_directory, paste("leftrightratioplot", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = "")),
+                width = 10, height = 10)
   print(p)
   dev.off()
 
@@ -158,14 +163,15 @@ examine_error <- function(Measured, codes_file, data_path = "rawData") {
   p <- ggplot(data=Asymerrordata, aes(x=LeftRightRatio, y=se.robust, color=asuniform)) + geom_point(alpha=0.5) +
     scale_x_log10("Left:Right Ratio") + scale_y_log10("Robust SE") + geom_vline(xintercept=2, lty=3) +
     annotate("text", label="Use Uniform if Pr{above LOD} < 0.2 or \nrobust SE > 0.5", x=0.1, y=1, hjust=0)
-  pdf(paste("AsymmetryvsSE_", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = ""), width=11, height=11)
+  pdf(file.path(save_directory, paste("AsymmetryvsSE_", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = "")),
+                width=11, height=11)
   print(p)
   dev.off()
 
   Measured$PosteriorShape <- factor(Asymerrordata$asuniform, labels=c("normal","uniform"))
 
   print(paste("Saving outputs to NewMeasured_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  save(Measured, file = paste("NewMeasured_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
+  save(Measured, file = file.path(save_directory, paste("NewMeasured_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   return(Measured)
 
 }
@@ -179,6 +185,11 @@ examine_error <- function(Measured, codes_file, data_path = "rawData") {
 #' @param j Row number of dsgn
 #' @param dsgn Measured (output from running the readNHANES function)
 #'             with the Prabove column, sorted by this column.
+#' @param demofiles Character vector of demographic files in the codes file
+#' @param datafiles Character vector of NHANES chemical files in the codes file
+#' @param chemwt Character vector of chemical weight files in the codes file
+#' @param bwtfiles Character vector of bodyweight files in the codes file
+#' @param creatfiles Character vector of creatinine files in the codes file
 #'
 #' @import survey
 #' @import ggplot2
@@ -204,13 +215,18 @@ examine_error <- function(Measured, codes_file, data_path = "rawData") {
 #' @export
 #'
 #'
-doplots <- function(j, dsgn) {
+doplots <- function(j, dsgn, demofiles, datafiles, chemwt, bwtfiles, creatfiles) {
   if (is.na(dsgn$loggm_se[j]))
     return(list(plot=paste("Row",j,"loggm_se is NA"),
                 Rightseg=NA,
                 Leftseg=NA,
                 se.robust=NA,
                 se.model=NA))
+
+  lunitscale <- log(c("ug/L" = 1.0,"ng/mL" = 1.0,"ng/L" = 0.001, "pg/mL" = 0.001))
+  measurehead <- "URX"
+  lodindhd <- "URD"
+  lodtail <- "LC"
 
   #datafile <- tolower(dsgn$NHANESfile[j])
   datafile <- dsgn$NHANESfile[j]
@@ -375,11 +391,12 @@ doplots <- function(j, dsgn) {
                   "LOD:",signif(log(Vlod), digits=2),
                   "Above LOD:", dsgn$Sample_Size[j] - dsgn$BelowLOD[j],
                   "Pr{Above LOD}:", signif(dsgn$Prabove[j], digits=2)))
-  list(plot=p,
-       Leftseg=Leftseg,
-       Rightseg=Rightseg,
-       se.robust=se,
-       se.model=se.model)
+  plots <- list(plot=p,
+                Leftseg=Leftseg,
+                Rightseg=Rightseg,
+                se.robust=se,
+                se.model=se.model)
+  return(plots)
 }
 
 

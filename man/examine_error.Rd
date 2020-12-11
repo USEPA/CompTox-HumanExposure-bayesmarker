@@ -4,7 +4,7 @@
 \alias{examine_error}
 \title{examine_error}
 \usage{
-examine_error(Measured, codes_file, data_path = "rawData")
+examine_error(Measured, codes_file, data_path = ".", save_directory = ".")
 }
 \arguments{
 \item{Measured}{A data frame containing a row for each metabolite with columns
@@ -16,9 +16,12 @@ chemicals to include (with identifier, code, file, demographic, and units),
 2. Associated weights, filenames, and column names associated with each phase used,
 and 3. Parent-metabolite map containing chemical identifiers and molecular weights.}
 
-\item{data_path}{String providing the path to the raw data.  Default is "rawData",
+\item{data_path}{String providing the path to the raw data.  Default is ".",
 the direct output from running get_NHANES_data would be "rawData", resulting
-in e.g. ./rawData/1999-2000}
+in e.g. ./rawData/1999-2000.}
+
+\item{save_directory}{String giving the path of where to save the output table
+and plot.}
 }
 \value{
 Measured: same as the input, but with 4 additional columns.

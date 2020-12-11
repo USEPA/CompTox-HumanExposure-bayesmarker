@@ -164,7 +164,8 @@ readNHANES <- function(codes_file, data_path = NULL, save_directory = ".") {
   # Remove rows for chemicals that didn't have a parent (NA for mult columns)
   z <- unique(Measured[is.na(Measured$recent_sample),c(1,2)])
   print(paste("Warning:  ", dim(z)[1], " have measurement data but are missing a parent.
-              Chemical identifiers for these metabolites were saved in the file ChemsWithoutParents.csv", sep = ""))
+              Chemical identifiers for these metabolites were saved in the file ChemsWithoutParents",
+              format(Sys.time(), "%Y-%m-%d"), ".csv", sep = ""))
   write.csv(z, file = file.path(save_directory, paste("ChemsWithoutParent_", format(Sys.time(), "%Y-%m-%d"),
                                                       ".csv", sep = "")), row.names = FALSE)
   Measured <- Measured[!is.na(Measured$recent_sample),]
@@ -246,12 +247,13 @@ readNHANES <- function(codes_file, data_path = NULL, save_directory = ".") {
   ## -------------------------------------------------------------------------------------------
   ## Outputs
   print(paste("Saving returned outputs as MCMCdata_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
-  save(Measured, pred.data, Uses, mapping,
-       file = file.path(save_directory, paste("MCMCdata_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   result <- list(Measured = Measured,
                  pred.data = pred.data,
                  Uses = Uses,
                  mapping = mapping)
+  save(result, file = file.path(save_directory, paste("MCMCdata_", format(Sys.time(), "%Y-%m-%d"),
+                                                      ".RData", sep = "")))
+
   return(result)
 
 }

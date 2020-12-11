@@ -4,13 +4,23 @@
 \alias{doplots}
 \title{doplots}
 \usage{
-doplots(j, dsgn)
+doplots(j, dsgn, demofiles, datafiles, chemwt, bwtfiles, creatfiles)
 }
 \arguments{
 \item{j}{Row number of dsgn}
 
 \item{dsgn}{Measured (output from running the readNHANES function)
 with the Prabove column, sorted by this column.}
+
+\item{demofiles}{Character vector of demographic files in the codes file}
+
+\item{datafiles}{Character vector of NHANES chemical files in the codes file}
+
+\item{chemwt}{Character vector of chemical weight files in the codes file}
+
+\item{bwtfiles}{Character vector of bodyweight files in the codes file}
+
+\item{creatfiles}{Character vector of creatinine files in the codes file}
 }
 \value{
 outplots a list with length equal to the number of chemicals,
