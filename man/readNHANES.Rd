@@ -4,7 +4,12 @@
 \alias{readNHANES}
 \title{readNHANES}
 \usage{
-readNHANES(codes_file, data_path = NULL, save_directory = ".")
+readNHANES(
+  codes_file,
+  data_path = NULL,
+  cohort = "newest",
+  save_directory = "."
+)
 }
 \arguments{
 \item{codes_file}{Manually created xls or xlsx file containing 3 sheets:  1. NHANES
@@ -16,6 +21,9 @@ and 3. Parent-metabolite map containing chemical identifiers and molecular weigh
 the direct output from running get_NHANES_data would be "rawData", if left NULL, resulting
 in e.g. ./rawData/1999-2000  If the directory is a subdirectory of your working one,
 include "./" (e.g. "./test" will look in "./test/rawData")}
+
+\item{cohort}{NHANES cycle/phase/cohort to analyze within the codes file. Default is to use the most recent
+cycle. Other options include "oldest", "all"}
 
 \item{save_directory}{String providing the directory in which to save the NHANES data files.  If left as the default,
 NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.}

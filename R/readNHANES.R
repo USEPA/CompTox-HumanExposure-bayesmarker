@@ -13,12 +13,15 @@
 #' the direct output from running get_NHANES_data would be "rawData", if left NULL, resulting
 #' in e.g. ./rawData/1999-2000  If the directory is a subdirectory of your working one,
 #' include "./" (e.g. "./test" will look in "./test/rawData")
+#' @param cohort NHANES cycle/phase/cohort to analyze within the codes file. Default is to use the most recent
+#' cycle. Other options include "oldest", "all"
 #' @param save_directory String providing the directory in which to save the NHANES data files.  If left as the default,
 #'                       NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.
 #'
 #' @importFrom gdata read.xls
 #' @importFrom parallel mclapply
 #' @importFrom utils write.csv
+#' @importFrom prodlim row.match
 #'
 #' @return Measured: a data frame containing a row for each metabolite with columns
 #'                   providing the chemical identifiers, log geometric means, subpopulation,
@@ -33,7 +36,7 @@
 #'
 #' @examples # readNHANES("NHANEScodes.xlsx", "rawData")
 #'
-readNHANES <- function(codes_file, data_path = NULL, save_directory = ".") {
+readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_directory = ".") {
 
   ## Curated EXCEL spreadsheet giving information about the variables and files used in
   ## this analysis
@@ -54,6 +57,30 @@ readNHANES <- function(codes_file, data_path = NULL, save_directory = ".") {
   convtbl <- read.xls(NHANEScodes, as.is = TRUE)
   wtvars <- read.xls(NHANEScodes, sheet = 2, as.is = TRUE)
 
+  cycles <- c("99-00", "01-02", "03-04", "05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
+  if (length(cohort) == 1){
+    if (cohort == "newest"){
+
+    }
+    if (cohort %in% cycles){
+      convtbl <- convtbl[convtbl$recent_sample %in% cohort,]
+      wtvars <- wtvars[wtvars$sample %in% cohort,]
+    }
+  } else if (length(cohort) > 1){
+      convtbl <- convtbl[convtbl$recent_sample %in% cohort,]
+      wtvars <- wtvars[wtvars$sample %in% cohort,]
+  }
+
+
+  # Which phases to combine
+  byChem <- function(chem, ref){
+    ind <- ref$CAS == chem
+    res <- ref$recent_sample[ind]
+  }
+  phaseTbl <- lapply(unique(convtbl$CAS), byChem, ref = convtbl[,c("CAS", "recent_sample")])
+  names(phaseTbl) <- unique(convtbl$CAS)
+
+
   #### Data checks
   print("Checking input codes file")
   if (any(convtbl$CAS == "")){
@@ -61,9 +88,17 @@ readNHANES <- function(codes_file, data_path = NULL, save_directory = ".") {
     convtbl <- convtbl[!(convtbl$CAS == ""),]
     print(paste("Warning:  removed ", missing, " rows due to missing CAS"), sep = "")
   }
-  if (any(duplicated(convtbl$CAS))) {
-    print("Error:  duplicate chemical identifiers, each row must have a unique identifier.")
+  tmp2 <- do.call(rbind, lapply(phaseTbl, function(x) c(length(unique(x)), length(x))))
+  if (any(tmp2[,1] != tmp2[,2])) {
+    issue <- which(tmp2[,1] != tmp2[,2])
+    print("Duplicate chemical identifier - cohort pair(s) detected. Each chemical identifier must have a
+          unique associated cohort.  Problem chemicals:")
+    print(names(tmp2)[issue])
     stop()
+  }
+  if (any(tmp2[,2] > 1)){
+    print("Chemical(s) spanning multiple cohorts. Data will be combined. See input argument 'group' for details")
+    group <- TRUE
   }
 
   ## datapaths gives the paths for the NHANES individual .xpt data files.  This
@@ -75,55 +110,109 @@ readNHANES <- function(codes_file, data_path = NULL, save_directory = ".") {
                                                     paste("20", substring(x, 1, 3), "20", substring(x, 4, 5), sep = ""),
                                                     paste("19", substring(x, 1, 3), "20", substring(x, 4, 5), sep = "")))
   if (is.null(data_path)){
-    datapaths <- structure(file.path(".","rawData", long), names= names(long))
+    datapaths <- structure(file.path(".","rawData", long), names = names(long))
   } else {
-    datapaths <- structure(file.path(data_path,"rawData", long), names= names(long))
+    datapaths <- structure(file.path(data_path,"rawData", long), names = names(long))
   }
 
   ## First, run through all the input files and estimate quantiles.
   demofiles <- wtvars$demofile
   names(demofiles) <- wtvars$sample
 
-  tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
-  datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], tolower(tmp$NHANESfile))
-  names(datafiles) <- tmp$NHANESfile
-  demofiles <- file.path(datapaths[as.character(tmp$recent_sample)], demofiles[as.character(tmp$recent_sample)])
-  #cat("demofiles: ", demofiles, "\n")
-  names(demofiles) <- tmp$NHANESfile ## associate a demo file with each data file
-  bwtfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
-                        tolower(wtvars$BWfile[match(names(demofiles), wtvars$file)]))
-  names(bwtfiles) <- tmp$NHANESfile
-  creatfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
-                          tolower(wtvars$creatfile[match(names(demofiles), wtvars$file)]))
-  names(creatfiles) <- tmp$NHANESfile
+  if (group){
+    datafiles <- list()
+    demofiles <- list()
+    bwtfiles <- list()
+    creatfiles <- list()
+    tmp2 <- list()
 
-  ## use getNHANESquantiles to estimate the 50th percentiles
-  ## getNhanesQuantiles assumes a "comment" variable for each input
-  ## variable, to contain the lod indicator.  Not all files have these.
-  ## Create them on an ad-hoc basis.
+    for (i in 1:length(phaseTbl)){
+      tmp3 <- c()
+      for (j in 1:length(phaseTbl[[i]])){
+        tmp4 <- c(phaseTbl[[i]][j],
+                           convtbl$NHANESfile[!is.na(row.match(convtbl[,c("CAS", "recent_sample")],
+                                                      data.frame(names(phaseTbl)[i],
+                                                      phaseTbl[[i]][j])))])
+        tmp3 <- rbind(tmp4, tmp3)
+      }
+      tmp2[[i]] <- tmp3
+      colnames(tmp2[[i]]) <- c("recent_sample", "NHANESfile")
+    }
+    names(tmp2) <- names(phaseTbl)
 
-  scaledata <- vector("list", length(datafiles))
-  chemvars <- split(as.character(convtbl$NHANEScode), f=convtbl$NHANESfile)
-  chemwt <- wtvars$wtvariable
-  names(chemwt) <- wtvars$file
+    datafiles2 <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                    tolower(x[,2])))
 
-  print("Starting geometric mean estimations")
-  scaledata <-
-    mclapply(1:length(datafiles),
-             FUN=function(i) {
-               getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
-                                  chem2yrwt=chemwt[names(datafiles)[i]],
-                                  chemvars=chemvars[[names(datafiles)[i]]],
-                                  CreatFun=creatinine,
-                                  bodywtfile=bwtfiles[names(datafiles)[i]],
-                                  creatfile=creatfiles[names(datafiles)[i]],
-                                  Q=c(50),
-                                  code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
-                                            codename="NHANEScode",CAS="CAS",chemname="Name"),
-                                  LODfilter=FALSE,
-                                  MaximumAge=150)
-             },
-             mc.preschedule=FALSE, mc.cores=7)
+    demofiles2 <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                     demofiles[as.character(x[,1])]))
+
+    bwtfiles2 <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                        tolower(wtvars$BWfile[match(paste(x[,2], ".XPT", sep = ""), wtvars$file)])))
+
+    creatfiles2 <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                        tolower(wtvars$creatfile[match(paste(x[,2], ".XPT", sep = ""), wtvars$file)])))
+
+    scaledata <- vector("list", length(phaseTbl))
+    # Need chemvars to be a single chemical and then pass the files as vectors
+    chemvars <- convtbl$NHANEScode[match(names(tmp2), convtbl$CAS)]
+    chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[wtvars$file %in% paste(x[,2], ".XPT", sep = "")])
+
+    print("Starting geometric mean estimations")
+    scaledata <-
+      mclapply(1:length(tmp2),
+               FUN=function(i) {
+                 getNhanesQuantiles(demof=demofiles[[i]], chemdtaf=datafiles[[i]], lognormfit=TRUE,
+                                    chem2yrwt=chemwt[[i]][1],
+                                    chemvars=chemvars[i],
+                                    CreatFun=creatinine,
+                                    bodywtfile=bwtfiles[[i]],
+                                    creatfile=creatfiles[[i]],
+                                    Q=c(50),
+                                    code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
+                                              codename="NHANEScode",CAS="CAS",chemname="Name"),
+                                    LODfilter=FALSE,
+                                    MaximumAge=150, group = group)
+               },
+               mc.preschedule=FALSE, mc.cores=7)
+
+  } else {
+
+    tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
+    datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], tolower(tmp$NHANESfile))
+    names(datafiles) <- tmp$NHANESfile
+    demofiles <- file.path(datapaths[as.character(tmp$recent_sample)], demofiles[as.character(tmp$recent_sample)])
+    #cat("demofiles: ", demofiles, "\n")
+    names(demofiles) <- tmp$NHANESfile ## associate a demo file with each data file
+    bwtfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
+                          tolower(wtvars$BWfile[match(names(demofiles), wtvars$file)]))
+    names(bwtfiles) <- tmp$NHANESfile
+    creatfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
+                            tolower(wtvars$creatfile[match(names(demofiles), wtvars$file)]))
+    names(creatfiles) <- tmp$NHANESfile
+
+    scaledata <- vector("list", length(datafiles))
+    chemvars <- split(as.character(convtbl$NHANEScode), f=convtbl$NHANESfile)
+    chemwt <- wtvars$wtvariable
+    names(chemwt) <- wtvars$file
+
+    print("Starting geometric mean estimations")
+    scaledata <-
+      mclapply(1:length(datafiles),
+               FUN=function(i) {
+                 getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
+                                    chem2yrwt=chemwt[names(datafiles)[i]],
+                                    chemvars=chemvars[[names(datafiles)[i]]],
+                                    CreatFun=creatinine,
+                                    bodywtfile=bwtfiles[names(datafiles)[i]],
+                                    creatfile=creatfiles[names(datafiles)[i]],
+                                    Q=c(50),
+                                    code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
+                                              codename="NHANEScode",CAS="CAS",chemname="Name"),
+                                    LODfilter=FALSE,
+                                    MaximumAge=150)
+               },
+               mc.preschedule=FALSE, mc.cores=7)
+  }
 
   scalequants <- do.call("rbind", scaledata)
 

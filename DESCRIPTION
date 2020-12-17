@@ -30,6 +30,7 @@ Imports:
     methods,
     logspline,
     nor1mix,
-    reshape2
+    reshape2,
+    prodlim
 Depends: 
     R (>= 2.10)
