@@ -79,6 +79,7 @@
 #' @importFrom graphics lines points segments
 #' @importFrom foreign read.xport
 #'
+#'
 #' @return A dataframe with columns:
 #'   NHANEScode: nhanes variable name
 #'   Chem: chemical name (if !is.null(code) in arguments)
@@ -136,39 +137,9 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
                                Q=c(50,75,90,95), lognormfit=TRUE, plot=NULL, code=NULL,
                                LODfilter=TRUE, MaximumAge = 150) {
   ## ----------------------------------------------------------------
-  ## Sanity Checks
-  if (!file.exists(demof)) stop(paste(demof, "not found"))
-  if (missing(chemdtaf) || !file.exists(chemdtaf)) {
-    stop(paste("File for chemical data",chemdtaf, "not found"))
-  }
-  demo <- read.xport(demof)
-  cdta <- read.xport(chemdtaf)
-  demovars <- c(seq,PSU,STRA,demoageyr,demogendr,demoeth,MECwt)
-  if (any(!(XX <- demovars %in% colnames(demo)))) {
-    stop(paste("Variables requested NOT in ",demof,": ",
-               paste(demovars[!XX],collapse=", "), sep=""))
-  }
 
-  # For newer NHANES phases, need to get creatinine column from creatinine file.
-  # Otherwise just use the creatinine column in the metabolite measurement file.
-  chemvars2 <- c(seq, chem2yrwt, chemvars)
-  if (creatinine %in% colnames(cdta)) {
-    chemvars2 <- c(chemvars2, creatinine)
-    scalebycreatinine <- TRUE
-  } else if (!is.null(creatinine)) {
-    creat <- read.xport(creatfile)
-    cdta <- merge(cdta, creat[,c(seq, creatinine)], all.x = TRUE)
-    chemvars2 <- c(chemvars2, creatinine)
-    scalebycreatinine <- TRUE
-  } else {
-    scalebycreatinine <- FALSE
-  }
-
-  # NHANES suggests scaling creatinine measurements before 2007 using a pairwise
-  # equation to be more comparable.  Do this here.
+  # For scaling data before 2007
   oldmethod <- c("1999-2000", "2001-2002", "2003-2004", "2005-2006")
-  ind <- unlist(sapply(oldmethod, function(x) grep(x, demof)))
-  # scaling function
   scale_old <- function(z) {
     if (!is.na(z)) {
       if (z < 75) {
@@ -183,50 +154,169 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     }
     return(z)
   }
-  # Apply if this phase is in oldmethod
-  if (length(ind) > 0) {
-    cdta[,creatinine] <- sapply(cdta[,creatinine], scale_old)
-  }
+
+  ## Sanity Checks
+  if (length(demof) > 1){
+
+    demo <- c()
+    cdta <- c()
+    bwt <- c()
+    for (i in 1:length(demof)){
+      if (!file.exists(demof[i])) stop(paste(demof[i], "not found"))
+      miss_test <- chemdtaf[i]
+      if (missing(miss_test) || !file.exists(chemdtaf[i])) {
+        stop(paste("File for chemical data", chemdtaf[i], "not found"))
+      }
+      tmp <- read.xport(demof[i])
+      tmp2 <- read.xport(chemdtaf[i])
+      demovars <- c(seq,PSU,STRA,demoageyr,demogendr,demoeth,MECwt)
+      if (any(!(XX <- demovars %in% colnames(tmp)))) {
+        stop(paste("Variables requested NOT in ",demof[i],": ",
+                   paste(demovars[!XX],collapse=", "), sep=""))
+      }
+
+      # Deal with creatinine: get file if column not there and scale old data
+      chemvars2 <- c(seq, chem2yrwt, chemvars)
+      if (!is.null(creatinine)) {
+        creat <- read.xport(creatfile[i])
+        tmp2 <- merge(tmp2, creat[,c(seq, creatinine)], all.x = TRUE)
+      }
+      chemvars2 <- c(chemvars2, creatinine)
+      scalebycreatinine <- TRUE
+      ####
+      ind <- unlist(sapply(oldmethod, function(x) grep(x, demof[i])))
+      # Apply if this phase is in oldmethod
+      if (length(ind) > 0) {
+        tmp2[,creatinine] <- sapply(tmp2[,creatinine], scale_old)
+      }
+
+      ##  cat("getNhanesQuantiles, chemvars2: \"", chemvars2, "\"\n")
+      if (any(!(XX <- chemvars2 %in% colnames(tmp2)))) {
+        stop(paste("Variables requested NOT in ",chemdtaf[i],": ",
+                   paste(chemvars2[!XX], collapse=", "), sep=""))
+      }
+
+      if (!is.null(urinefile[i])) {
+        if (is.null(urinerate[i]))
+          stop("File for urinerate specified without variable name for urine rate.")
+        if (!file.exists(urinefile[i])) stop(paste(urinefile[i],"not found."))
+        urine <- read.xport(urinefile[i])
+        if (!urinerate %in% colnames(urine[i]))
+          stop(paste(urinrate[i],"not in",urinefile[i]))
+        scalebyurinerate <- TRUE
+      } else {
+        scalebyurinerate <- FALSE
+      }
+      ## scalebyurinerate dominates scalebycreatinine, so set the latter
+      ## to false if we are scaling by urinerate
+      if (scalebyurinerate) scalebycreatinine <- FALSE
+
+      if (!is.null(bodywtfile[i])) {
+        if (is.null(bodywt))
+          stop("File for bodywt specified without variable name for body weight.")
+        if (is.null(bodywtcomment))
+          stop("Must specify name for bodywtcomment")
+        if (is.null(MECwt))
+          stop("Must specify name for Exam Weights")
+        if (!file.exists(bodywtfile[i])) stop(paste(bodywtfile[i], "not found."))
+        tmp3 <- read.xport(bodywtfile[i])
+        if (any(!(XX <- c(bodywt, bodywtcomment,bodymassindex) %in% colnames(bwt))))
+          stop(paste(paste(c(bodywt,bodywtcomment,bodymassindex)[XX],collapse=", "),"not in",bodywtfile[i]))
+        scalebybodywt <- TRUE
+      } else {
+        scalebybodywt <- FALSE
+        bodywt <- NULL
+        bodywtcomment <- NULL
+        MECwt <- NULL
+      }
+
+      demo <- rbind(tmp, demo)
+      cdta <- rbind(tmp2, cdta)
+      bwt <- rbind(tmp3, bwt)
+    }
+
+    # Deal with combined weights
+    demo[,MECwt] <- demo[,MECwt]/length(demof)
 
 
-  ##  cat("getNhanesQuantiles, chemvars2: \"", chemvars2, "\"\n")
-  if (any(!(XX <- chemvars2 %in% colnames(cdta)))) {
-    stop(paste("Variables requested NOT in ",chemdtaf,": ",
-               paste(chemvars2[!XX], collapse=", "), sep=""))
-  }
-
-  if (!is.null(urinefile)) {
-    if (is.null(urinerate))
-      stop("File for urinerate specified without variable name for urine rate.")
-    if (!file.exists(urinefile)) stop(paste(urinefile,"not found."))
-    urine <- read.xport(urinefile)
-    if (!urinerate %in% colnames(urine))
-      stop(paste(urinrate,"not in",urinefile))
-    scalebyurinerate <- TRUE
   } else {
-    scalebyurinerate <- FALSE
-  }
-  ## scalebyurinerate dominates scalebycreatinine, so set the latter
-  ## to false if we are scaling by urinerate
-  if (scalebyurinerate) scalebycreatinine <- FALSE
 
-  if (!is.null(bodywtfile)) {
-    if (is.null(bodywt))
-      stop("File for bodywt specified without variable name for body weight.")
-    if (is.null(bodywtcomment))
-      stop("Must specify name for bodywtcomment")
-    if (is.null(MECwt))
-      stop("Must specify name for Exam Weights")
-    if (!file.exists(bodywtfile)) stop(paste(bodywtfile, "not found."))
-    bwt <- read.xport(bodywtfile)
-    if (any(!(XX <- c(bodywt, bodywtcomment,bodymassindex) %in% colnames(bwt))))
-      stop(paste(paste(c(bodywt,bodywtcomment,bodymassindex)[XX],collapse=", "),"not in",bodywtfile))
-    scalebybodywt <- TRUE
-  } else {
-    scalebybodywt <- FALSE
-    bodywt <- NULL
-    bodywtcomment <- NULL
-    MECwt <- NULL
+    if (!file.exists(demof)) stop(paste(demof, "not found"))
+    if (missing(chemdtaf) || !file.exists(chemdtaf)) {
+      stop(paste("File for chemical data",chemdtaf, "not found"))
+    }
+    demo <- read.xport(demof)
+    cdta <- read.xport(chemdtaf)
+    demovars <- c(seq,PSU,STRA,demoageyr,demogendr,demoeth,MECwt)
+    if (any(!(XX <- demovars %in% colnames(demo)))) {
+      stop(paste("Variables requested NOT in ",demof,": ",
+                 paste(demovars[!XX],collapse=", "), sep=""))
+    }
+
+
+    # For newer NHANES phases, need to get creatinine column from creatinine file.
+    # Otherwise just use the creatinine column in the metabolite measurement file.
+    chemvars2 <- c(seq, chem2yrwt, chemvars)
+    if (creatinine %in% colnames(cdta)) {
+      chemvars2 <- c(chemvars2, creatinine)
+      scalebycreatinine <- TRUE
+    } else if (!is.null(creatinine)) {
+      creat <- read.xport(creatfile)
+      cdta <- merge(cdta, creat[,c(seq, creatinine)], all.x = TRUE)
+      chemvars2 <- c(chemvars2, creatinine)
+      scalebycreatinine <- TRUE
+    } else {
+      scalebycreatinine <- FALSE
+    }
+
+    # NHANES suggests scaling creatinine measurements before 2007 using a pairwise
+    # equation to be more comparable.  Do this here.
+    oldmethod <- c("1999-2000", "2001-2002", "2003-2004", "2005-2006")
+    ind <- unlist(sapply(oldmethod, function(x) grep(x, demof)))
+    # Apply if this phase is in oldmethod
+    if (length(ind) > 0) {
+      cdta[,creatinine] <- sapply(cdta[,creatinine], scale_old)
+    }
+
+    ##  cat("getNhanesQuantiles, chemvars2: \"", chemvars2, "\"\n")
+    if (any(!(XX <- chemvars2 %in% colnames(cdta)))) {
+      stop(paste("Variables requested NOT in ",chemdtaf,": ",
+                 paste(chemvars2[!XX], collapse=", "), sep=""))
+    }
+
+    if (!is.null(urinefile)) {
+      if (is.null(urinerate))
+        stop("File for urinerate specified without variable name for urine rate.")
+      if (!file.exists(urinefile)) stop(paste(urinefile,"not found."))
+      urine <- read.xport(urinefile)
+      if (!urinerate %in% colnames(urine))
+        stop(paste(urinrate,"not in",urinefile))
+      scalebyurinerate <- TRUE
+    } else {
+      scalebyurinerate <- FALSE
+    }
+    ## scalebyurinerate dominates scalebycreatinine, so set the latter
+    ## to false if we are scaling by urinerate
+    if (scalebyurinerate) scalebycreatinine <- FALSE
+
+    if (!is.null(bodywtfile)) {
+      if (is.null(bodywt))
+        stop("File for bodywt specified without variable name for body weight.")
+      if (is.null(bodywtcomment))
+        stop("Must specify name for bodywtcomment")
+      if (is.null(MECwt))
+        stop("Must specify name for Exam Weights")
+      if (!file.exists(bodywtfile)) stop(paste(bodywtfile, "not found."))
+      bwt <- read.xport(bodywtfile)
+      if (any(!(XX <- c(bodywt, bodywtcomment,bodymassindex) %in% colnames(bwt))))
+        stop(paste(paste(c(bodywt,bodywtcomment,bodymassindex)[XX],collapse=", "),"not in",bodywtfile))
+      scalebybodywt <- TRUE
+    } else {
+      scalebybodywt <- FALSE
+      bodywt <- NULL
+      bodywtcomment <- NULL
+      MECwt <- NULL
+    }
   }
 
   if (length(MaximumAge) == 1) MaximumAge <- rep(MaximumAge, length(chemvars))

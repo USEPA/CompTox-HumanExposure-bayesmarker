@@ -49,13 +49,13 @@ get_NHANES_data <- function(codes_file = NULL, save_directory = NULL) {
 
 
   ### Add demographic, bodyweight, and creatinine files
-  weights <- read.xls(codes_file, sheet = 2)
   result <- list()
   for (i in 1:length(samps)) {
     ind <- match(samps[i], weights$sample)
-    result[[i]] <- c(labFiles[[i]], paste(ifelse(samps[i] != "99-00", "DEMO_", "DEMO"), ref$Ext[ref$Short == samps[i]], ".XPT", sep = ""),
+    result[[i]] <- c(paste(labFiles[[i]], ".XPT", sep = ""),
+                     paste(ifelse(samps[i] != "99-00", "DEMO_", "DEMO"), ref$Ext[ref$Short == samps[i]], ".XPT", sep = ""),
                      paste(ifelse(samps[i] != "99-00", "BMX_", "BMX"), ref$Ext[ref$Short == samps[i]], ".XPT", sep = ""),
-                     toupper(weights$creatfile[ind]))
+                     toupper(weights$creatfile[ind]), toupper(weights$urineflow[ind]))
   }
   names(result) <- samps
 
@@ -71,13 +71,19 @@ get_NHANES_data <- function(codes_file = NULL, save_directory = NULL) {
         dir.create("./rawData")
       }
     } else {
+      if (!dir.exists(save_directory)){
+        dir.create(save_directory)
+      }
       if (!dir.exists(file.path(save_directory, "rawData/"))) {
-        dir.create(file.path(save_directory, "rawData"))
+        dir.create(file.path(save_directory, "rawData/"))
       }
     }
 
     # Download the files
     for (j in 1:length(result[[i]])) {
+      if (result[[i]][j] == ""){
+        next
+      }
       if (is.null(save_directory)){
         if (!dir.exists(paste("rawData/", ref$Full[indP], sep = ""))) {
           dir.create(paste("./rawData", ref$Full[indP], sep = ""))

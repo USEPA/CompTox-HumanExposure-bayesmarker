@@ -42,11 +42,6 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   ## this analysis
   NHANEScodes <- codes_file
 
-  ##########
-  # Assumed that all files (demo, bmx, other) are lowercase. Search "tolower" when needing a more elegant solution.
-  ##########
-
-
   ## -------------------------------------------------------------------
   ##             Construct object 'measured', which contains all the
   ##             information we will use about the products measured
@@ -60,7 +55,11 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   cycles <- c("99-00", "01-02", "03-04", "05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
   if (length(cohort) == 1){
     if (cohort == "newest"){
-
+      chems <- unique(convtbl$NHANEScode)
+      ind <- sapply(chems, function(x) max(which(cycles %in% convtbl$recent_sample[convtbl$NHANEScode == x])))
+      ind2 <- row.match(data.frame(chems, cycles[ind]), convtbl[,c("NHANEScode", "recent_sample")])
+      convtbl <- convtbl[ind2,]
+      wtvars <- wtvars[wtvars$file %in% convtbl$NHANESfile,]
     }
     if (cohort %in% cycles){
       convtbl <- convtbl[convtbl$recent_sample %in% cohort,]
@@ -86,6 +85,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   if (any(convtbl$CAS == "")){
     missing <- sum(convtbl$CAS == "")
     convtbl <- convtbl[!(convtbl$CAS == ""),]
+    phaseTbl[[which(names(phaseTbl) == "")]] <- NULL
     print(paste("Warning:  removed ", missing, " rows due to missing CAS"), sep = "")
   }
   tmp2 <- do.call(rbind, lapply(phaseTbl, function(x) c(length(unique(x)), length(x))))
@@ -120,19 +120,14 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   names(demofiles) <- wtvars$sample
 
   if (group){
-    datafiles <- list()
-    demofiles <- list()
-    bwtfiles <- list()
-    creatfiles <- list()
     tmp2 <- list()
-
     for (i in 1:length(phaseTbl)){
       tmp3 <- c()
       for (j in 1:length(phaseTbl[[i]])){
         tmp4 <- c(phaseTbl[[i]][j],
-                           convtbl$NHANESfile[!is.na(row.match(convtbl[,c("CAS", "recent_sample")],
+                  paste(convtbl$NHANESfile[!is.na(row.match(convtbl[,c("CAS", "recent_sample")],
                                                       data.frame(names(phaseTbl)[i],
-                                                      phaseTbl[[i]][j])))])
+                                                                 phaseTbl[[i]][j])))], ".XPT", sep = ""))
         tmp3 <- rbind(tmp4, tmp3)
       }
       tmp2[[i]] <- tmp3
@@ -140,22 +135,19 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
     }
     names(tmp2) <- names(phaseTbl)
 
-    datafiles2 <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+    datafiles <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
                                                     tolower(x[,2])))
-
-    demofiles2 <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
-                                                     demofiles[as.character(x[,1])]))
-
-    bwtfiles2 <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
-                        tolower(wtvars$BWfile[match(paste(x[,2], ".XPT", sep = ""), wtvars$file)])))
-
-    creatfiles2 <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
-                        tolower(wtvars$creatfile[match(paste(x[,2], ".XPT", sep = ""), wtvars$file)])))
+    demofiles <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                    demofiles[as.character(x[,1])]))
+    bwtfiles <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                   tolower(wtvars$BWfile[match(x[,2], wtvars$file)])))
+    creatfiles <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                     tolower(wtvars$creatfile[match(x[,2], wtvars$file)])))
 
     scaledata <- vector("list", length(phaseTbl))
     # Need chemvars to be a single chemical and then pass the files as vectors
     chemvars <- convtbl$NHANEScode[match(names(tmp2), convtbl$CAS)]
-    chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[wtvars$file %in% paste(x[,2], ".XPT", sep = "")])
+    chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[wtvars$file %in% x[,2]])
 
     print("Starting geometric mean estimations")
     scaledata <-
@@ -171,7 +163,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
                                     code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
                                               codename="NHANEScode",CAS="CAS",chemname="Name"),
                                     LODfilter=FALSE,
-                                    MaximumAge=150, group = group)
+                                    MaximumAge=150)
                },
                mc.preschedule=FALSE, mc.cores=7)
 
