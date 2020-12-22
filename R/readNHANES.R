@@ -147,14 +147,14 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
     scaledata <- vector("list", length(phaseTbl))
     # Need chemvars to be a single chemical and then pass the files as vectors
     chemvars <- convtbl$NHANEScode[match(names(tmp2), convtbl$CAS)]
-    chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[wtvars$file %in% x[,2]])
+    chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[match(x[,2], wtvars$file)])
 
     print("Starting geometric mean estimations")
     scaledata <-
       mclapply(1:length(tmp2),
                FUN=function(i) {
                  getNhanesQuantiles(demof=demofiles[[i]], chemdtaf=datafiles[[i]], lognormfit=TRUE,
-                                    chem2yrwt=chemwt[[i]][1],
+                                    chem2yrwt=chemwt[[i]],
                                     chemvars=chemvars[i],
                                     CreatFun=creatinine,
                                     bodywtfile=bwtfiles[[i]],
@@ -324,6 +324,24 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   Uses <- UseTable[indx,]
   Uses$NearField <- as.numeric(with(Uses, FRAGRANCE | FOOD.ADDITIVE | CONSUMER.USE | PERSONAL.CARE.PRODUCT | PHARMACEUTICAL))
   pred.data$NearField <- Uses$NearField
+
+
+  ## ----------------------------------------------------------------------------------
+  ## Each chemical will have a row for each phase it was measured in.  So if data was merged
+  ## combine file and sample rows into one string.  Need this information moving forward.
+  if (group){
+    metabs <- unique(Measured[,c("CAS", "subpop")])
+    newPhase <- c()
+    newFile <- c()
+    for (i in 1:dim(metabs)[1]){
+      ind <- which(!is.na(row.match(Measured[,c("CAS", "subpop")], metabs[i,])))
+      newPhase[i] <- paste(Measured$recent_sample[ind], collapse = ",")
+      newFile[i] <- paste(Measured$NHANESfile[ind], collapse = ",")
+    }
+    Measured <- Measured[!duplicated(Measured[,c("CAS", "subpop")]),]
+    Measured$recent_sample <- newPhase
+    Measured$NHANESfile <- newFile
+  }
 
   ## -------------------------------------------------------------------------------------------
   ## Outputs

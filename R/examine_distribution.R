@@ -95,20 +95,43 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   demofiles <- wtvars$demofile
   names(demofiles) <- wtvars$sample
 
-  tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
-  datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], tolower(tmp$NHANESfile))
-  names(datafiles) <- tmp$NHANESfile
-  demofiles <- file.path(datapaths[as.character(tmp$recent_sample)], demofiles[as.character(tmp$recent_sample)])
-  #cat("demofiles: ", demofiles, "\n")
-  names(demofiles) <- tmp$NHANESfile ## associate a demo file with each data file
-  bwtfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
-                        tolower(wtvars$BWfile[match(names(demofiles), wtvars$file)]))
-  names(bwtfiles) <- tmp$NHANESfile
-  creatfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
-                          tolower(wtvars$creatfile[match(names(demofiles), wtvars$file)]))
-  names(creatfiles) <- tmp$NHANESfile
-  chemwt <- wtvars$wtvariable
-  names(chemwt) <- tolower(wtvars$file)
+  if (length(grep(",", Measured$NHANESfile))){
+    # Combined data, have multiple files
+    tmp2 <- list()
+    metabs <- unique(Measured$CAS)
+    for (i in 1:length(metabs)){
+      ind <- match(metabs[i], Measured$CAS)
+      tmp2[[i]] <- cbind(strsplit(Measured$recent_sample[ind], split = ",")[[1]],
+                   paste(strsplit(Measured$NHANESfile[ind], split = ",")[[1]], ".XPT", sep = ""))
+    }
+    names(tmp2) <- metabs
+
+    datafiles <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                    tolower(x[,2])))
+    demofiles <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                    demofiles[as.character(x[,1])]))
+    bwtfiles <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                   tolower(wtvars$BWfile[match(x[,2], wtvars$file)])))
+    creatfiles <- lapply(tmp2, function(x) file.path(datapaths[as.character(x[,1])],
+                                                     tolower(wtvars$creatfile[match(x[,2], wtvars$file)])))
+    chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[match(x[,2], wtvars$file)])
+
+  } else {
+    tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
+    datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], tolower(tmp$NHANESfile))
+    names(datafiles) <- tmp$NHANESfile
+    demofiles <- file.path(datapaths[as.character(tmp$recent_sample)], demofiles[as.character(tmp$recent_sample)])
+    #cat("demofiles: ", demofiles, "\n")
+    names(demofiles) <- tmp$NHANESfile ## associate a demo file with each data file
+    bwtfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
+                          tolower(wtvars$BWfile[match(names(demofiles), wtvars$file)]))
+    names(bwtfiles) <- tmp$NHANESfile
+    creatfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
+                            tolower(wtvars$creatfile[match(names(demofiles), wtvars$file)]))
+    names(creatfiles) <- tmp$NHANESfile
+    chemwt <- wtvars$wtvariable
+    names(chemwt) <- tolower(wtvars$file)
+  }
 
   # Check to see if any chemicals use units we haven't accounted for
   lunitscale <- log(c("ug/L" = 1.0,"ng/mL" = 1.0,"ng/L" = 0.001, "pg/mL" = 0.001))
@@ -228,16 +251,24 @@ doplots <- function(j, dsgn, demofiles, datafiles, chemwt, bwtfiles, creatfiles)
   lodindhd <- "URD"
   lodtail <- "LC"
 
-  #datafile <- tolower(dsgn$NHANESfile[j])
-  datafile <- dsgn$NHANESfile[j]
   NM <- dsgn$NHANEScode[j]
-
   meascore <- sub(paste("^",measurehead,"(.+)","$",sep=""),"\\1",NM)
   nmlc <- paste(lodindhd,meascore,lodtail,sep="")
 
-  design0 <- getDesign(demof=demofiles[datafile], chemdtaf=datafiles[datafile], chem2yrwt=chemwt[tolower(datafile)],
-                       nm=NM, CreatFun=creatinine, bodywtfile=bwtfiles[datafile],
-                       creatfile=creatfiles[datafile])
+  if (class(demofiles) == "list"){
+    # There is combined data (more than 1 file per chemical).
+    # Do getDesign per chemical instead of per file
+    chem <- dsgn$CAS[j]
+    design0 <- getDesign(demof=demofiles[chem], chemdtaf=datafiles[chem], chem2yrwt=chemwt[chem],
+                         nm=NM, CreatFun=creatinine, bodywtfile=bwtfiles[chem],
+                         creatfile=creatfiles[chem])
+  } else {
+    datafile <- dsgn$NHANESfile[j]
+    design0 <- getDesign(demof=demofiles[datafile], chemdtaf=datafiles[datafile], chem2yrwt=chemwt[tolower(datafile)],
+                         nm=NM, CreatFun=creatinine, bodywtfile=bwtfiles[datafile],
+                         creatfile=creatfiles[datafile])
+  }
+
   keep <- switch(dsgn$subpop[j],
                  Total=rep(TRUE, nrow(design0$variables)),              # This and next line reduces design to the age group
                  Male=design0$variables$RIAGENDR == "Male",             # for this row in measured
