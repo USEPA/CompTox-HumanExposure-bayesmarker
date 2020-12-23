@@ -259,9 +259,9 @@ doplots <- function(j, dsgn, demofiles, datafiles, chemwt, bwtfiles, creatfiles)
     # There is combined data (more than 1 file per chemical).
     # Do getDesign per chemical instead of per file
     chem <- dsgn$CAS[j]
-    design0 <- getDesign(demof=demofiles[chem], chemdtaf=datafiles[chem], chem2yrwt=chemwt[chem],
-                         nm=NM, CreatFun=creatinine, bodywtfile=bwtfiles[chem],
-                         creatfile=creatfiles[chem])
+    design0 <- getDesign(demof=demofiles[[chem]], chemdtaf=datafiles[[chem]], chem2yrwt=chemwt[[chem]],
+                         nm=NM, CreatFun=creatinine, bodywtfile=bwtfiles[[chem]],
+                         creatfile=creatfiles[[chem]])
   } else {
     datafile <- dsgn$NHANESfile[j]
     design0 <- getDesign(demof=demofiles[datafile], chemdtaf=datafiles[datafile], chem2yrwt=chemwt[tolower(datafile)],

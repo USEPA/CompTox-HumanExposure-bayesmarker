@@ -512,7 +512,9 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
 
   output <- list(out.samps3R = out.samps3R,
                  out.coda3R = out.coda3R,
-                 nhanesdata = nhanesdata)
+                 nhanesdata = nhanesdata,
+                 Measured = Measured,
+                 pred.data = pred.data)
 
   print(paste("Save final result in the file OnlyPparms3_", SUBPOP, "_",
               format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))

@@ -77,7 +77,7 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
   ## -----------------------------------------------------------------------
   ## Replicate Measured and pred.data as they existed when the inputs for this
   ## data set were created.
-  Measured <- subset(Measured, subpop == SUBPOP)
+  #Measured <- subset(Measured, subpop == SUBPOP)
   M <- nrow(Measured)
   Mn <- sum(Measured$PosteriorShape == "normal")
   ## Resort Measured so that the normal posteriors come first, then
@@ -96,7 +96,7 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
     c(x[1], mean(z), x[2])
   }))
 
-  if (doplots){
+  if (doplot){
     tdta <- data.frame(y=lUests[,2], x=Measured$loggm, ylower=lUests[,1], yupper=lUests[,3],
                        xlower=Measured$loggm - Measured$loggm_se * 1.96,
                        xupper=Measured$loggm + Measured$loggm_se * 1.96,
@@ -108,7 +108,7 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
       geom_abline(xintercept=0, yintercept=1, lty=3, color="darkgray") +
       scale_y_continuous("Estimated lU", limits=c(-7.5,2.5)) +
       scale_x_continuous("Measurement from NHANES", limits=c(-40,5)) +
-      ggtitle("Excretion Rates for Urinary Metabolites")
+      ggtitle(paste("Excretion Rates for Urinary Metabolites:  ", SUBPOP, sep = ""))
     pdf(file = file.path(save_directory, paste("MetabComparison_", SUBPOP, "_",
                                                format(Sys.time(), "%Y-%m-%d"), ".pdf", sep="")))
     print(p)
@@ -118,10 +118,11 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
   ## Match up rows in pred.data to lP. They are in the same order, but when not all
   ## the parents have a prediction (e.g. limited data for 0 - 5 subpop), we need to
   ## use the right MWs and reduce rows of pred.data for output.
-  if (MissingCols) {
-    ind <- match(row.names(nhanesdata$Phi), pred.data$CAS)
-    pred.data <- pred.data[ind,]
-  }
+  #MissingCols <- ncol(nhanesdata$Phi) != M
+  #if (MissingCols) {
+  #  ind <- match(row.names(nhanesdata$Phi), pred.data$CAS)
+  #  pred.data <- pred.data[ind,]
+  #}
 
   lPsampsmo <- as.matrix(out.coda3R[,grep("^lP\\[", varnames(out.coda3R))])
 
@@ -129,7 +130,7 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
 
   lPsampsgm <- sweep(lPsampsmo, 2 ,adjust,"+")
 
-  row.names(lPsampsgm) <- pred.data$CAS
+  colnames(lPsampsgm) <- pred.data$CAS
 
   save(lPsampsgm, Measured, file=file.path(save_directory, paste("lPsamps-gm_kg_day_", SUBPOP, "_",
                                                   format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
@@ -139,5 +140,4 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
   return(lPsamps)
 
 }
-
 

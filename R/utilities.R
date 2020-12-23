@@ -1159,7 +1159,7 @@ getDesign <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", measureta
 
       # Deal with creatinine: get file if column not there and scale old data
       tmp2 <- read.xport(chemdtaf[i])
-      chemvars2 <- c(seq, chem2yrwt[i], chemvars)
+      chemvars2 <- c(seq, chem2yrwt[i], nm)
       if (creatinine %in% colnames(tmp2)) {
         chemvars2 <- c(chemvars2, creatinine)
         scalebycreatinine <- TRUE
