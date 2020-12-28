@@ -99,6 +99,8 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   if (any(tmp2[,2] > 1)){
     print("Chemical(s) spanning multiple cohorts. Data will be combined. See input argument 'group' for details")
     group <- TRUE
+  } else {
+    group <- FALSE
   }
 
   ## datapaths gives the paths for the NHANES individual .xpt data files.  This
@@ -169,17 +171,23 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
 
   } else {
 
+    # Some variables are missing a weight
+    if (any(wtvars$wtvariable == "")){
+      print("Warning:  at least one data file is missing the 2 year weight. This file and its chemicals will be discarded.")
+      convtbl <- convtbl[!paste(convtbl$NHANESfile, ".XPT", sep = "") == wtvars$file[wtvars$wtvariable == ""],]
+      wtvars <- wtvars[!wtvars$wtvariable == "",]
+    }
     tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
-    datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], tolower(tmp$NHANESfile))
+    datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], paste(tolower(tmp$NHANESfile), ".xpt", sep = ""))
     names(datafiles) <- tmp$NHANESfile
     demofiles <- file.path(datapaths[as.character(tmp$recent_sample)], demofiles[as.character(tmp$recent_sample)])
     #cat("demofiles: ", demofiles, "\n")
     names(demofiles) <- tmp$NHANESfile ## associate a demo file with each data file
     bwtfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
-                          tolower(wtvars$BWfile[match(names(demofiles), wtvars$file)]))
+                          tolower(wtvars$BWfile[match(paste(names(demofiles), ".XPT", sep = ""), wtvars$file)]))
     names(bwtfiles) <- tmp$NHANESfile
     creatfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
-                            tolower(wtvars$creatfile[match(names(demofiles), wtvars$file)]))
+                            tolower(wtvars$creatfile[match(paste(names(demofiles), ".XPT", sep = ""), wtvars$file)]))
     names(creatfiles) <- tmp$NHANESfile
 
     scaledata <- vector("list", length(datafiles))
@@ -187,12 +195,13 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
     chemwt <- wtvars$wtvariable
     names(chemwt) <- wtvars$file
 
+
     print("Starting geometric mean estimations")
     scaledata <-
       mclapply(1:length(datafiles),
                FUN=function(i) {
                  getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
-                                    chem2yrwt=chemwt[names(datafiles)[i]],
+                                    chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
                                     chemvars=chemvars[[names(datafiles)[i]]],
                                     CreatFun=creatinine,
                                     bodywtfile=bwtfiles[names(datafiles)[i]],
@@ -203,7 +212,22 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
                                     LODfilter=FALSE,
                                     MaximumAge=150)
                },
-               mc.preschedule=FALSE, mc.cores=7)
+               mc.preschedule=FALSE, mc.cores = min(c(length(datafiles), 7)))
+#    for (i in 1:length(datafiles)){
+#      print(datafiles[i])
+#      scaledata[[i]] <- getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
+#                                           chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
+#                                           chemvars=chemvars[[names(datafiles)[i]]],
+#                                           CreatFun=creatinine,
+#                                           bodywtfile=bwtfiles[names(datafiles)[i]],
+#                                           creatfile=creatfiles[names(datafiles)[i]],
+#                                           Q=c(50),
+#                                           code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
+#                                                                   codename="NHANEScode",CAS="CAS",chemname="Name"),
+#                                           LODfilter=FALSE,
+#                                           MaximumAge=150)
+#   }
+
   }
 
   scalequants <- do.call("rbind", scaledata)
@@ -244,9 +268,12 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
 
   # Remove rows for chemicals that didn't have a parent (NA for mult columns)
   z <- unique(Measured[is.na(Measured$recent_sample),c(1,2)])
-  print(paste("Warning:  ", dim(z)[1], " have measurement data but are missing a parent.
+  print(paste("Warning:  ", dim(z)[1], " chemicals have measurement data but are missing a parent.
               Chemical identifiers for these metabolites were saved in the file ChemsWithoutParents",
               format(Sys.time(), "%Y-%m-%d"), ".csv", sep = ""))
+  if (!dir.exists(save_directory)){
+    dir.create(save_directory)
+  }
   write.csv(z, file = file.path(save_directory, paste("ChemsWithoutParent_", format(Sys.time(), "%Y-%m-%d"),
                                                       ".csv", sep = "")), row.names = FALSE)
   Measured <- Measured[!is.na(Measured$recent_sample),]

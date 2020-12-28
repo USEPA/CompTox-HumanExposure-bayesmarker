@@ -41,6 +41,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   nms <- unique(Measured$subpop)
 
   ## Look at the distribution of loggm_se
+  print("Generate distribution plots for the chemical geometric mean standard errors")
   pdf(file = file.path(save_directory, paste("dists_loggm_se_", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = "")))
   for (nm in nms) {
     print(nm)
@@ -117,20 +118,26 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
     chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[match(x[,2], wtvars$file)])
 
   } else {
+    # Some variables are missing a weight
+    if (any(wtvars$wtvariable == "")){
+      print("Warning:  at least one data file is missing the 2 year weight. This file and its chemicals will be discarded.")
+      convtbl <- convtbl[!paste(convtbl$NHANESfile, ".XPT", sep = "") == wtvars$file[wtvars$wtvariable == ""],]
+      wtvars <- wtvars[!wtvars$wtvariable == "",]
+    }
     tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
-    datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], tolower(tmp$NHANESfile))
+    datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], paste(tolower(tmp$NHANESfile), ".xpt", sep = ""))
     names(datafiles) <- tmp$NHANESfile
     demofiles <- file.path(datapaths[as.character(tmp$recent_sample)], demofiles[as.character(tmp$recent_sample)])
     #cat("demofiles: ", demofiles, "\n")
     names(demofiles) <- tmp$NHANESfile ## associate a demo file with each data file
     bwtfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
-                          tolower(wtvars$BWfile[match(names(demofiles), wtvars$file)]))
+                          tolower(wtvars$BWfile[match(paste(names(demofiles), ".XPT", sep = ""), wtvars$file)]))
     names(bwtfiles) <- tmp$NHANESfile
     creatfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
-                            tolower(wtvars$creatfile[match(names(demofiles), wtvars$file)]))
+                            tolower(wtvars$creatfile[match(paste(names(demofiles), ".XPT", sep = ""), wtvars$file)]))
     names(creatfiles) <- tmp$NHANESfile
     chemwt <- wtvars$wtvariable
-    names(chemwt) <- tolower(wtvars$file)
+    names(chemwt) <- tolower(gsub(".XPT", "", wtvars$file))
   }
 
   # Check to see if any chemicals use units we haven't accounted for
@@ -150,7 +157,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   J <- 1:nrow(Measured)
 
   #outplots <- mclapply(J, doplots, dsgn=Measured, mc.preschedule=TRUE, mc.cores=11)
-
+  print("Run doplots function for each chemical")
   registerDoMC(cores = 10)
   outplots <- foreach(i = J) %dopar% {
     tmp <- doplots(i, dsgn = Measured, demofiles, datafiles, chemwt, bwtfiles, creatfiles)
