@@ -437,27 +437,42 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
 
   print("Set up initial conditions")
 
-  ## getInits finds extreme values
+  ## getInits finds extreme values by picking random directions and identifying
+  ## the pth furthers away sample in that direction. Default of p=0.05 picks
+  ## values that are close to the central tendency.
   getInits <- function(X, ninits=3, P=0.05)
   {
     ## X is an mcmc object, essentially a matrix.
     dta <- scale(X)
+    # the available samples:
+    indx <- seq(nrow(dta))
+    # figure out which sample we are going to keep each time
+    keep <- round(P*length(indx)) ## this works fine as long as length(indx) > 20
     ## Ultimately, we are looking for ninits indices into the elements of X
-    outinits <- numeric(ninits)
+    ## Start with random values in case something fails:
+    outinits <- sample(indx,ninits)
     ## Pick ninits random directions.  Project the data in dta on each direction
     ## and pick the Pth quantile (since the original direction u was random
     ## u and -u are equally likely).
     for (i in 1:ninits)
     {
-      u <- rnorm(ncol(dta))
+      # pick a random direction:
+      u <- rnorm(ncol(dta))     
+      # normalize the direction to a unit vector:
       u <- u/sqrt(sum(u*u))
+      # make sure all values are good:
+      u[is.na(u)] <- 0
+      # calculate projection of each sample onto unit vector:
       lngt <- dta %*% u
-      indx <- seq(along=lngt)
-      keep <- round(P*length(indx)) ## this works fine as long as length(indx) > 20
+      # make sure all values are good:
+      lngt[is.na(lngt)] <- median(lngt,na.rm=T)
+      # sort distances from low to high:
       oind <- order(lngt)
-      outinits[i] <- oind[keep]
+      #make sure we've got a valid index to dta:
+      if (oind[keep] %in% indx) outinits[i] <- oind[keep]
     }
-    outinits
+    
+    return(outinits)
   }
   ## Get 3 hyperdispersed points.
   out.coda <- out.samples[[1]]
