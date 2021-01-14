@@ -172,11 +172,11 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   } else {
 
     # Some variables are missing a weight
-    if (any(wtvars$wtvariable == "")){
-      print("Warning:  at least one data file is missing the 2 year weight. This file and its chemicals will be discarded.")
-      convtbl <- convtbl[!paste(convtbl$NHANESfile, ".XPT", sep = "") == wtvars$file[wtvars$wtvariable == ""],]
-      wtvars <- wtvars[!wtvars$wtvariable == "",]
-    }
+    #if (any(wtvars$wtvariable == "")){
+    #  print("Warning:  at least one data file is missing the 2 year weight. This file and its chemicals will be discarded.")
+    #  convtbl <- convtbl[!paste(convtbl$NHANESfile, ".XPT", sep = "") == wtvars$file[wtvars$wtvariable == ""],]
+    #  wtvars <- wtvars[!wtvars$wtvariable == "",]
+    #}
     tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
     datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], paste(tolower(tmp$NHANESfile), ".xpt", sep = ""))
     names(datafiles) <- tmp$NHANESfile
