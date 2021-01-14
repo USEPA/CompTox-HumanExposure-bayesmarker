@@ -513,8 +513,8 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
     NBurnin <- 5000
   }
 
-  #save(inits2, file = file.path(save_directory, paste("Inits_", SUBPOP, "_",
-  #                              format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
+  save(Indx, inits2, file = file.path(save_directory, paste("Inits_", SUBPOP, "_",
+                                format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   print("Start main computation")
   registerDoMC(cores = cores)
   out.samps3R <- foreach(i = 1:3) %dopar% {
