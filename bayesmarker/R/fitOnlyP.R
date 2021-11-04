@@ -513,6 +513,8 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
     NBurnin <- 5000
   }
 
+  save(Indx, inits2, file = file.path(save_directory, paste("Inits_", SUBPOP, "_",
+                                format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   print("Start main computation")
   registerDoMC(cores = cores)
   out.samps3R <- foreach(i = 1:3) %dopar% {
@@ -522,7 +524,15 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
                            n.iter=NIters*Thin, thin=Thin)
     return(result)
   }
-
+  #out.samps3R <- c()
+  #for (i in 1:3){
+  #  print(paste("Running initial condition number ", i, sep = ""))
+  #  model <- jags.model(textConnection(bayes_model), data=nhanesdata,
+  #                      inits=inits2[i], n.chains=1, n.adapt=NBurnin)
+  #  out.samps3R[[i]] <- coda.samples(model, variable.names=c("lP","phi","lU","lPmu","sd.V"),
+  #                         n.iter=NIters*Thin, thin=Thin)
+  #}
+  
   out.coda3R <- do.call("mcmc.list", lapply(out.samps3R, function(z) z[[1]]))
 
   output <- list(out.samps3R = out.samps3R,
