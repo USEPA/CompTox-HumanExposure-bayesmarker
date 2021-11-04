@@ -24,19 +24,19 @@ allow the identification of public health priority chemicals via risk-based bioa
 
 ### Installing
 
-Adapted from <a href="https://doi.org/10.1080/17425255.2021.1935867">Breen et al. (2021)</a>
-* Getting Started with R Package httk from the R command line
+* Getting Started with R Package bayesmarker from the R command line
 ```
-install.packages(httk)
+library(devtools)
+install_github("HumanExposure/bayesmarker")
 ```
 * RStudio provides a menu ‘Install Packages’ under ‘Tools’ tab
-* Load the HTTK data, models, and functions
+* Load the bayesmarker data and functions
 ```
-library(httk)
+library(bayesmarker)
 ```
 * Check what version you are using 
 ```
-packageVersion(httk)
+packageVersion(bayesmarker)
 ```
 
 ## Authors
