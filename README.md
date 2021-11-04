@@ -37,7 +37,7 @@ library(httk)
 * Check what version you are using 
 ```
 packageVersion(httk)
-
+```
 
 ## Authors
 
