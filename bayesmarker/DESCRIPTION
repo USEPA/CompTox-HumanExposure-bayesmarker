@@ -31,6 +31,7 @@ Imports:
     logspline,
     nor1mix,
     reshape2,
-    prodlim
+    prodlim,
+    doParallel
 Depends: 
     R (>= 2.10)
