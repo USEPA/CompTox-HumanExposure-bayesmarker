@@ -162,6 +162,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
                                     bodywtfile=bwtfiles[[i]],
                                     creatfile=creatfiles[[i]],
                                     Q=c(50),
+                                    codes_table = convtbl,
                                     code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
                                               codename="NHANEScode",CAS="CAS",chemname="Name"),
                                     LODfilter=FALSE,
@@ -207,6 +208,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
                                     bodywtfile=bwtfiles[names(datafiles)[i]],
                                     creatfile=creatfiles[names(datafiles)[i]],
                                     Q=c(50),
+                                    codes_table = convtbl,
                                     code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
                                               codename="NHANEScode",CAS="CAS",chemname="Name"),
                                     LODfilter=FALSE,
@@ -354,7 +356,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
 
 
   ## ----------------------------------------------------------------------------------
-  ## Each chemical will have a row for each phase it was measured in.  So if data was merged
+  ## Each chemical will have a row for each phase it was measured in.  So if data was merged,
   ## combine file and sample rows into one string.  Need this information moving forward.
   if (group){
     metabs <- unique(Measured[,c("CAS", "subpop")])
