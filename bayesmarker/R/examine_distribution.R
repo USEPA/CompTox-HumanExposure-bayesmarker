@@ -73,7 +73,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   ## datapaths gives the paths for the NHANES individual .xpt data files.  This
   ## construct gives a vector of paths, one for each sample set.  We then
   ## name the files using the shorthand name for each sample set
-  phases <- unique(Measured$recent_sample)
+  phases <- unique(unlist(sapply(Measured$recent_sample, function(x) strsplit(x, ","))))
   ind <- sort(substring(phases, 4, 5), index.return = TRUE)
   long <- sapply(phases[ind$ix], function(x) ifelse(as.numeric(substring(x, 1, 2)) < 50,
                                                     paste("20", substring(x, 1, 3), "20", substring(x, 4, 5), sep = ""),
@@ -93,10 +93,14 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   convtbl <- read.xls(NHANEScodes,as.is=TRUE)
   wtvars <- read.xls(NHANEScodes, sheet=2, as.is=TRUE)
 
+  # Reduce these 2 tables to include cohorts only in Measured
+  convtbl <- convtbl[convtbl$recent_sample %in% phases,]
+  wtvars <- wtvars[wtvars$sample %in% phases,]
+                 
   demofiles <- wtvars$demofile
   names(demofiles) <- wtvars$sample
 
-  if (length(grep(",", Measured$NHANESfile))){
+  if (length(grep(",", Measured$NHANESfile)) > 0){
     # Combined data, have multiple files
     tmp2 <- list()
     metabs <- unique(Measured$CAS)
@@ -118,6 +122,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
     chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[match(x[,2], wtvars$file)])
 
   } else {
+    
     # Some variables are missing a weight
     if (any(wtvars$wtvariable == "")){
       print("Warning:  at least one data file is missing the 2 year weight. This file and its chemicals will be discarded.")
@@ -125,6 +130,10 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
       wtvars <- wtvars[!wtvars$wtvariable == "",]
     }
     tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
+    # Only keep the phases in Measured
+    tmp <- tmp[tmp$recent_sample %in% phases,]
+    wtvars <- wtvars[wtvars$sample %in% phases, ]
+    # Obtain list of files
     datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], paste(tolower(tmp$NHANESfile), ".xpt", sep = ""))
     names(datafiles) <- tmp$NHANESfile
     demofiles <- file.path(datapaths[as.character(tmp$recent_sample)], demofiles[as.character(tmp$recent_sample)])
@@ -160,7 +169,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   print("Run doplots function for each chemical")
   registerDoMC(cores = 10)
   outplots <- foreach(i = J) %dopar% {
-    tmp <- doplots(i, dsgn = Measured, demofiles, datafiles, chemwt, bwtfiles, creatfiles)
+    tmp <- doplots(i, dsgn = Measured, demofiles, datafiles, chemwt, bwtfiles, creatfiles, codes_table = convtbl)
     return(tmp)
   }
 
@@ -220,6 +229,9 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
 #' @param chemwt Character vector of chemical weight files in the codes file
 #' @param bwtfiles Character vector of bodyweight files in the codes file
 #' @param creatfiles Character vector of creatinine files in the codes file
+#' @param codes_table R dataframe of the first sheet of the codes_file in the 
+#'                    readNHANES() function reduced to the cohorts of interest
+#'                    (those contained in Measured or dsgn here)
 #'
 #' @import survey
 #' @import ggplot2
@@ -245,7 +257,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
 #' @export
 #'
 #'
-doplots <- function(j, dsgn, demofiles, datafiles, chemwt, bwtfiles, creatfiles) {
+doplots <- function(j, dsgn, demofiles, datafiles, chemwt, bwtfiles, creatfiles, codes_table) {
   if (is.na(dsgn$loggm_se[j]))
     return(list(plot=paste("Row",j,"loggm_se is NA"),
                 Rightseg=NA,
@@ -268,12 +280,13 @@ doplots <- function(j, dsgn, demofiles, datafiles, chemwt, bwtfiles, creatfiles)
     chem <- dsgn$CAS[j]
     design0 <- getDesign(demof=demofiles[[chem]], chemdtaf=datafiles[[chem]], chem2yrwt=chemwt[[chem]],
                          nm=NM, CreatFun=creatinine, bodywtfile=bwtfiles[[chem]],
-                         creatfile=creatfiles[[chem]])
+                         creatfile=creatfiles[[chem]], codes_table = codes_table)
   } else {
+    # Run per file (multiple chemicals per file)
     datafile <- dsgn$NHANESfile[j]
     design0 <- getDesign(demof=demofiles[datafile], chemdtaf=datafiles[datafile], chem2yrwt=chemwt[tolower(datafile)],
                          nm=NM, CreatFun=creatinine, bodywtfile=bwtfiles[datafile],
-                         creatfile=creatfiles[datafile])
+                         creatfile=creatfiles[datafile], codes_table = codes_table)
   }
 
   keep <- switch(dsgn$subpop[j],
