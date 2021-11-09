@@ -56,6 +56,7 @@
 #' @param Q Vector of percentiles to estimate (e.g. 50 = 50th percentile)
 #' @param plot If not NULL, the name to give a pdf file for plotting CDFs, empirical and lognormal
 #'       from parameter estimates
+#' @param codes_table R dataframe of the first sheet of the codes_file in the readNHANES() function
 #' @param lognormfit Logical, fit a lognormal distribution to data (including the subpopulations)
 #' @param code Information for adding chemical names and CAS numbers to the output.  Is a list with elements
 #'         table: a character matrix or data frame with character (not
@@ -134,6 +135,7 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
                                bodywt="BMXWT",bodywtcomment="BMIWT",
                                bodymassindex="BMXBMI",
                                MECwt="WTMEC2YR",
+                               codes_table = NULL,
                                Q=c(50,75,90,95), lognormfit=TRUE, plot=NULL, code=NULL,
                                LODfilter=TRUE, MaximumAge = 150) {
   ## ----------------------------------------------------------------
@@ -155,6 +157,8 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     return(z)
   }
 
+  unitscale <- c("ug/L" = 1.0,"ng/mL" = 1.0,"ng/L" = 0.001, "pg/mL" = 0.001)
+  
   ## Sanity Checks
   if (length(demof) > 1){
 
@@ -177,6 +181,9 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
 
       # Deal with creatinine: get file if column not there and scale old data
       tmp2 <- read.xport(chemdtaf[i])
+      z <- grep(toupper(gsub(".xpt", "", basename(chemdtaf[i]))), codes_table$NHANESfile, fixed = TRUE)
+      y <- unname(z[which(codes_table$NHANEScode[z] == chemvars)])
+      tmp2[,chemvars] <- tmp2[,chemvars] * unitscale[codes_table$units[y]]
       chemvars2 <- c(seq, chem2yrwt[i], chemvars)
       if (creatinine %in% colnames(tmp2)) {
         chemvars2 <- c(chemvars2, creatinine)
@@ -261,6 +268,13 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     }
     demo <- read.xport(demof)
     cdta <- read.xport(chemdtaf)
+        
+    # Scale units
+    z <- sapply(codes_table$NHANESfile, function(x) grep(tolower(x), chemdtaf))
+    z <- which(lengths(z) > 0)
+    y <- unname(z[which(codes_table$NHANEScode[z] == chemvars)])
+    cdta[,chemvars] <- cdta[,chemvars] * unitscale[codes_table$units[y]]
+    
     demovars <- c(seq,PSU,STRA,demoageyr,demogendr,demoeth,MECwt)
     if (any(!(XX <- demovars %in% colnames(demo)))) {
       stop(paste("Variables requested NOT in ",demof,": ",
@@ -1093,6 +1107,7 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
 #' @param urinerate Variable in urinefile giving the rate of urine production
 #' @param bodywtfile File giving the body weight information
 #' @param bodymassindex Code for BMI information in the NHANES file.  Default is "BMXBMI".
+#' @param codes_table R dataframe of the first sheet of the codes_file in the readNHANES() function                     
 #' @param code Information for adding chemical names and CAS numbers to the output.  Is a list with elements
 #'         table: a character matrix or data frame with character (not
 #'                factor) elements giving the names NHANES uses for
@@ -1119,6 +1134,7 @@ getDesign <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", measureta
                       bodywt="BMXWT",bodywtcomment="BMIWT",
                       bodymassindex="BMXBMI",
                       MECwt="WTMEC2YR",
+                      codes_table = NULL,
                       code=NULL) {
   ## ----------------------------------------------------------------
   ## Sanity Checks
@@ -1138,6 +1154,8 @@ getDesign <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", measureta
     return(z)
   }
 
+  unitscale <- c("ug/L" = 1.0,"ng/mL" = 1.0,"ng/L" = 0.001, "pg/mL" = 0.001)
+  
   ## Sanity Checks
   if (length(demof) > 1){
     demo <- c()
@@ -1159,6 +1177,9 @@ getDesign <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", measureta
 
       # Deal with creatinine: get file if column not there and scale old data
       tmp2 <- read.xport(chemdtaf[i])
+      z <- grep(toupper(gsub(".xpt", "", basename(chemdtaf[i]))), codes_table$NHANESfile, fixed = TRUE)
+      y <- unname(z[which(codes_table$NHANEScode[z] == nm)])
+      tmp2[,nm] <- tmp2[,nm] * unitscale[codes_table$units[y]]
       chemvars2 <- c(seq, chem2yrwt[i], nm)
       if (creatinine %in% colnames(tmp2)) {
         chemvars2 <- c(chemvars2, creatinine)
@@ -1242,6 +1263,13 @@ getDesign <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", measureta
 
     demo <- read.xport(demof)
     cdta <- read.xport(chemdtaf)
+        
+    # Scale units
+    z <- sapply(codes_table$NHANESfile, function(x) grep(tolower(x), chemdtaf))
+    z <- which(lengths(z) > 0)
+    y <- unname(z[which(codes_table$NHANEScode[z] == nm)])
+    cdta[,nm] <- cdta[,nm] * unitscale[codes_table$units[y]]
+    
     demovars <- c(seq,PSU,STRA,demoageyr,demogendr,demoeth,MECwt)
     if (any(!(XX <- demovars %in% colnames(demo)))) {
       stop(paste("Variables requested NOT in ",demof,": ",
