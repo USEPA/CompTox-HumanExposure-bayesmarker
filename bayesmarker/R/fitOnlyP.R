@@ -99,6 +99,8 @@ model
 #' @import MASS
 #' @import nor1mix
 #' @importFrom coda varnames mcmc.list
+#' @importFrom doParallel registerDoParallel
+#' @importFrom parallel clusterEvalQ makeCluster
 #'
 #' @return out.samps3R
 #'         out.coda3R
@@ -490,6 +492,8 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
   for (i in 1:3)
   {
     inits2[[i]]$lP <- getsamps("^lP\\[")[Indx[i],]
+    inits2[[i]]$ly <- rep(mean(nhanesdata$ly, na.rm = TRUE), dim(nhanesdata$Phi)[2])
+    inits2[[i]]$ly[!is.na(nhanesdata$ly)] <- NA
     inits2[[i]]$sd.dum <- getsamps("^sd.V")[Indx[i],]
     inits2[[i]]$phi <- getsamps("phi")[Indx[i],]
     inits2[[i]]$lPmu <- getsamps("lPmu")[Indx[i],]
@@ -513,17 +517,25 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
     NBurnin <- 5000
   }
 
-  save(Indx, inits2, file = file.path(save_directory, paste("Inits_", SUBPOP, "_",
+  #ly <- nhanesdata$ly
+  save(Indx, nhanesdata, out.coda, inits2, file = file.path(save_directory, paste("Inits_", SUBPOP, "_",
                                 format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   print("Start main computation")
   registerDoMC(cores = cores)
-  out.samps3R <- foreach(i = 1:3) %dopar% {
+  #cl <- makeCluster(cores, type = "SOCK") 
+  #registerDoParallel(cl)
+  #clusterEvalQ(cl, rm(list = ls()))
+  #clusterExport(cl, library(rjags), envir = environment())
+  #clusterExport(cl, "bayes_model", envir = environment())
+  clength <- 1:cores
+  out.samps3R <- foreach(iter = clength) %dopar% {
     model <- jags.model(textConnection(bayes_model), data=nhanesdata,
-                        inits=inits2[i], n.chains=1, n.adapt=NBurnin)
+                        inits=inits2[iter], n.chains=1, n.adapt=NBurnin)
     result <- coda.samples(model, variable.names=c("lP","phi","lU","lPmu","sd.V"),
                            n.iter=NIters*Thin, thin=Thin)
     return(result)
   }
+  #stopCluster(cl)
   #out.samps3R <- c()
   #for (i in 1:3){
   #  print(paste("Running initial condition number ", i, sep = ""))
