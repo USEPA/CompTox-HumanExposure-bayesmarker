@@ -22,6 +22,10 @@
 #' @param out.coda3R Output from fitOnlyP. A MCMC list object.
 #' @param doplot Logical input to indicate whether a plot should be generated and saved.
 #'               Default is TRUE.
+#' @param codes_file Manually created xls or xlsx file containing 3 sheets:  1. NHANES
+#'                   chemicals to include (with identifier, code, file, demographic, and units),
+#'                   2. Associated weights, filenames, and column names associated with each phase used,
+#'                   and 3. Parent-metabolite map containing chemical identifiers and molecular weights.
 #' @param save_directory String specifying the directory in which to save the plot and results.
 #'
 #'
@@ -40,7 +44,7 @@
 #'
 #' @export
 #'
-fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplot = TRUE, save_directory = ".") {
+fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplot = TRUE, codes_file, save_directory = ".") {
 
   ## Take samples of lP from OnlyP, convert to a matrix, and convert from
   ## nmoles/kg bodyweight/day to mg/kg bodyweight/day
@@ -115,28 +119,31 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
     dev.off()
   }
 
-  ## Match up rows in pred.data to lP. They are in the same order, but when not all
-  ## the parents have a prediction (e.g. limited data for 0 - 5 subpop), we need to
-  ## use the right MWs and reduce rows of pred.data for output.
-  #MissingCols <- ncol(nhanesdata$Phi) != M
-  #if (MissingCols) {
-  #  ind <- match(row.names(nhanesdata$Phi), pred.data$CAS)
-  #  pred.data <- pred.data[ind,]
-  #}
-
+  # Parent chemicals: convert to final units and save
   lPsampsmo <- as.matrix(out.coda3R[,grep("^lP\\[", varnames(out.coda3R))])
-
   adjust <- log(pred.data$MW) - log(1e6)
-
-  lPsampsgm <- sweep(lPsampsmo, 2 ,adjust,"+")
-
+  lPsampsgm <- sweep(lPsampsmo, 2 ,adjust, "+")
   colnames(lPsampsgm) <- pred.data$CAS
-
   save(lPsampsgm, Measured, file=file.path(save_directory, paste("lPsamps-gm_kg_day_", SUBPOP, "_",
                                                   format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
-  lPsamps <- list(lPsampsgm = lPsampsgm,
-                  Measured = Measured,
-                  plot = p)
+  
+  # Same for metabolites.  Get the molecular weights from the metabolite map in the codes file
+  map <- read.xls(codes_file, sheet=3, as.is = TRUE)
+  ind <- match(Measured$CAS, map$CAS.1)
+  MWs <- map$MW.1[ind]
+  adjust <- log(MWs) - log(1e6)
+  lU <- sweep(lU, 2, adjust, "+")
+  colnames(lU) <- Measured$CAS
+  save(lU, file=file.path(save_directory, paste("lU-gm_kg_day_", SUBPOP, "_",
+                                              format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
+  if (doplot == TRUE){
+    lPsamps <- list(lPsampsgm = lPsampsgm,
+                    Measured = Measured,
+                    plot = p)
+  } else {
+    lPsamps <- list(lPsampsgm = lPsampsgm,
+                    Measured = Measured)
+  }
   return(lPsamps)
 
 }
