@@ -96,11 +96,6 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   # Reduce these 2 tables to include cohorts only in Measured
   convtbl <- convtbl[convtbl$recent_sample %in% phases,]
   wtvars <- wtvars[wtvars$sample %in% phases,]
-<<<<<<< HEAD:bayesmarker/R/examine_distribution.R
-  
-=======
-                 
->>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf:bayesmarker/R/examine_distribution.R
   demofiles <- wtvars$demofile
   names(demofiles) <- wtvars$sample
 
@@ -126,7 +121,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
     chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[match(x[,2], wtvars$file)])
 
   } else {
-    
+
     # Some variables are missing a weight
     if (any(wtvars$wtvariable == "")){
       print("Warning:  at least one data file is missing the 2 year weight. This file and its chemicals will be discarded.")
@@ -233,7 +228,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
 #' @param chemwt Character vector of chemical weight files in the codes file
 #' @param bwtfiles Character vector of bodyweight files in the codes file
 #' @param creatfiles Character vector of creatinine files in the codes file
-#' @param codes_table R dataframe of the first sheet of the codes_file in the 
+#' @param codes_table R dataframe of the first sheet of the codes_file in the
 #'                    readNHANES() function reduced to the cohorts of interest
 #'                    (those contained in Measured or dsgn here)
 #'

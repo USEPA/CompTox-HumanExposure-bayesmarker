@@ -522,11 +522,7 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
                                 format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   print("Start main computation")
   registerDoMC(cores = cores)
-<<<<<<< HEAD:bayesmarker/R/fitOnlyP.R
   #cl <- makeCluster(cores, type = "SOCK")
-=======
-  #cl <- makeCluster(cores, type = "SOCK") 
->>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf:bayesmarker/R/fitOnlyP.R
   #registerDoParallel(cl)
   #clusterEvalQ(cl, rm(list = ls()))
   #clusterExport(cl, library(rjags), envir = environment())

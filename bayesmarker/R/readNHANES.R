@@ -208,11 +208,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
                                     bodywtfile=bwtfiles[names(datafiles)[i]],
                                     creatfile=creatfiles[names(datafiles)[i]],
                                     Q=c(50),
-<<<<<<< HEAD:bayesmarker/R/readNHANES.R
                                     codes_talbe = convtbl,
-=======
-                                    codes_table = convtbl,
->>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf:bayesmarker/R/readNHANES.R
                                     code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
                                               codename="NHANEScode",CAS="CAS",chemname="Name"),
                                     LODfilter=FALSE,
