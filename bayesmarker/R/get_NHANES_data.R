@@ -62,6 +62,8 @@ get_NHANES_data <- function(codes_file = NULL, save_directory = NULL) {
 
   ### Download the needed files from the NHANES website and save in the correct directory
   print("Starting Downlodas")
+  oldw <- getOption("warn")
+  options(warn = -1)
   for (i in 1:length(samps)) {
     indP <- match(samps[i], ref$Short)
 
@@ -89,22 +91,22 @@ get_NHANES_data <- function(codes_file = NULL, save_directory = NULL) {
           dir.create(paste("./rawData", ref$Full[indP], sep = ""))
         }
         print(paste("https://wwwn.cdc.gov/nchs/nhanes/", ref$Full[indP], "/", result[[i]][j], sep = ""))
-        download.file(paste("https://wwwn.cdc.gov/nchs/nhanes/", ref$Full[indP], "/", result[[i]][j], sep = ""),
+        tryCatch(download.file(paste("https://wwwn.cdc.gov/nchs/nhanes/", ref$Full[indP], "/", result[[i]][j], sep = ""),
                       destfile = paste("./rawData/", ref$Full[indP], "/", tolower(result[[i]][j]), sep = ""),
-                      mode = "wb")
+                      mode = "wb"), error = function(e) print(paste(result[[i]][j], 'was not found', sep = " ")))
       } else {
         if (!dir.exists(file.path(save_directory, paste("rawData/", ref$Full[indP], sep = "")))) {
           dir.create(file.path(save_directory, paste("rawData/", ref$Full[indP], sep = "")))
         }
         print(paste("https://wwwn.cdc.gov/nchs/nhanes/", ref$Full[indP], "/", result[[i]][j], sep = ""))
-        download.file(paste("https://wwwn.cdc.gov/nchs/nhanes/", ref$Full[indP], "/", result[[i]][j], sep = ""),
+        tryCatch(download.file(paste("https://wwwn.cdc.gov/nchs/nhanes/", ref$Full[indP], "/", result[[i]][j], sep = ""),
                       destfile = file.path(save_directory,
                                            paste("rawData/", ref$Full[indP], "/", tolower(result[[i]][j]), sep = "")),
-                      mode = "wb")
+                      mode = "wb"), error = function(e) print(paste(result[[i]][j], 'was not found', sep = " ")))
       }
     }
   }
-
+  options(warn = oldw)
 
 }
 
