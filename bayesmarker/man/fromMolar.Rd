@@ -11,6 +11,7 @@ fromMolar(
   nhanesdata,
   out.coda3R,
   doplot = TRUE,
+  codes_file,
   save_directory = "."
 )
 }
@@ -31,6 +32,11 @@ information to the final estimates.}
 
 \item{doplot}{Logical input to indicate whether a plot should be generated and saved.
 Default is TRUE.}
+
+\item{codes_file}{Manually created xls or xlsx file containing 3 sheets:  1. NHANES
+chemicals to include (with identifier, code, file, demographic, and units),
+2. Associated weights, filenames, and column names associated with each phase used,
+and 3. Parent-metabolite map containing chemical identifiers and molecular weights.}
 
 \item{save_directory}{String specifying the directory in which to save the plot and results.}
 }

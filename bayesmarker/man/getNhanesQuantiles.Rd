@@ -29,6 +29,7 @@ getNhanesQuantiles(
   bodywtcomment = "BMIWT",
   bodymassindex = "BMXBMI",
   MECwt = "WTMEC2YR",
+  codes_table = NULL,
   Q = c(50, 75, 90, 95),
   lognormfit = TRUE,
   plot = NULL,
@@ -98,6 +99,8 @@ later}
 \item{bodymassindex}{Code for BMI information in the NHANES file.  Default is "BMXBMI".}
 
 \item{MECwt}{Variable giving the weight to be used when analyzing a full MEC variable}
+
+\item{codes_table}{R dataframe of the first sheet of the codes_file in the readNHANES() function}
 
 \item{Q}{Vector of percentiles to estimate (e.g. 50 = 50th percentile)}
 

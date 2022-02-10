@@ -29,6 +29,7 @@ getDesign(
   bodywtcomment = "BMIWT",
   bodymassindex = "BMXBMI",
   MECwt = "WTMEC2YR",
+  codes_table = NULL,
   code = NULL
 )
 }
@@ -93,6 +94,8 @@ later}
 \item{bodymassindex}{Code for BMI information in the NHANES file.  Default is "BMXBMI".}
 
 \item{MECwt}{Variable giving the weight to be used when analyzing a full MEC variable}
+
+\item{codes_table}{R dataframe of the first sheet of the codes_file in the readNHANES() function}
 
 \item{code}{Information for adding chemical names and CAS numbers to the output.  Is a list with elements
 table: a character matrix or data frame with character (not

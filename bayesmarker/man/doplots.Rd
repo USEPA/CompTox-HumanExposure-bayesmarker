@@ -4,7 +4,16 @@
 \alias{doplots}
 \title{doplots}
 \usage{
-doplots(j, dsgn, demofiles, datafiles, chemwt, bwtfiles, creatfiles)
+doplots(
+  j,
+  dsgn,
+  demofiles,
+  datafiles,
+  chemwt,
+  bwtfiles,
+  creatfiles,
+  codes_table
+)
 }
 \arguments{
 \item{j}{Row number of dsgn}
@@ -21,6 +30,10 @@ with the Prabove column, sorted by this column.}
 \item{bwtfiles}{Character vector of bodyweight files in the codes file}
 
 \item{creatfiles}{Character vector of creatinine files in the codes file}
+
+\item{codes_table}{R dataframe of the first sheet of the codes_file in the
+readNHANES() function reduced to the cohorts of interest
+(those contained in Measured or dsgn here)}
 }
 \value{
 outplots a list with length equal to the number of chemicals,
