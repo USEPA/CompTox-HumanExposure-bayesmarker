@@ -268,7 +268,11 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     }
     demo <- read.xport(demof)
     cdta <- read.xport(chemdtaf)
+<<<<<<< HEAD:bayesmarker/R/utilities.R
     
+=======
+        
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf:bayesmarker/R/utilities.R
     # Scale units
     z <- sapply(codes_table$NHANESfile, function(x) grep(tolower(x), chemdtaf))
     z <- which(lengths(z) > 0)
@@ -1107,7 +1111,11 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
 #' @param urinerate Variable in urinefile giving the rate of urine production
 #' @param bodywtfile File giving the body weight information
 #' @param bodymassindex Code for BMI information in the NHANES file.  Default is "BMXBMI".
+<<<<<<< HEAD:bayesmarker/R/utilities.R
 #' @param codes_table R dataframe of the first sheet of the codes_file in the readNHANES() function
+=======
+#' @param codes_table R dataframe of the first sheet of the codes_file in the readNHANES() function                     
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf:bayesmarker/R/utilities.R
 #' @param code Information for adding chemical names and CAS numbers to the output.  Is a list with elements
 #'         table: a character matrix or data frame with character (not
 #'                factor) elements giving the names NHANES uses for
@@ -1263,7 +1271,11 @@ getDesign <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", measureta
 
     demo <- read.xport(demof)
     cdta <- read.xport(chemdtaf)
+<<<<<<< HEAD:bayesmarker/R/utilities.R
     
+=======
+        
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf:bayesmarker/R/utilities.R
     # Scale units
     z <- sapply(codes_table$NHANESfile, function(x) grep(tolower(x), chemdtaf))
     z <- which(lengths(z) > 0)

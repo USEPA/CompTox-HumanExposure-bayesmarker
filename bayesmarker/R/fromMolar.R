@@ -119,10 +119,17 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
     dev.off()
   }
 
+<<<<<<< HEAD:bayesmarker/R/fromMolar.R
   # Parent chemicals: convert to final units and save 
   lPsampsmo <- as.matrix(out.coda3R[,grep("^lP\\[", varnames(out.coda3R))])
   adjust <- log(pred.data$MW) - log(1e6)
   lPsampsgm <- sweep(lPsampsmo, 2, adjust, "+")
+=======
+  # Parent chemicals: convert to final units and save
+  lPsampsmo <- as.matrix(out.coda3R[,grep("^lP\\[", varnames(out.coda3R))])
+  adjust <- log(pred.data$MW) - log(1e6)
+  lPsampsgm <- sweep(lPsampsmo, 2 ,adjust, "+")
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf:bayesmarker/R/fromMolar.R
   colnames(lPsampsgm) <- pred.data$CAS
   save(lPsampsgm, Measured, file=file.path(save_directory, paste("lPsamps-gm_kg_day_", SUBPOP, "_",
                                                   format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))

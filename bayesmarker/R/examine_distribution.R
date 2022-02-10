@@ -96,7 +96,11 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   # Reduce these 2 tables to include cohorts only in Measured
   convtbl <- convtbl[convtbl$recent_sample %in% phases,]
   wtvars <- wtvars[wtvars$sample %in% phases,]
+<<<<<<< HEAD:bayesmarker/R/examine_distribution.R
   
+=======
+                 
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf:bayesmarker/R/examine_distribution.R
   demofiles <- wtvars$demofile
   names(demofiles) <- wtvars$sample
 

@@ -1,11 +1,19 @@
 # R Package "bayesmarker"
 
 This package provides a modeling approach that uses biomonitoring data and chemical metabolism 
+<<<<<<< HEAD
 information to estimate chemical exposure intake rates while carefully characterizing the uncertainties. 
 Bayesian methods are provided to infer ranges of exposure for parent chemicals consistent with 
 biomarkers identified in urine samples from the U.S population by the National Health and 
 Nutrition Examination Survey (NHANES). Metabolites arelinked to potential parent chemicals 
 using the NHANES reports and text mining of PubMed abstracts.
+=======
+information to estimate chemical exposure intake rates while carefully characterizing the uncertainties.
+Bayesian methods are provided to infer ranges of exposure for parent chemicals consistent with 
+biomarkers identified in urine samples from the U.S population by the National Health and 
+Nutrition Examination Survey (NHANES). Metabolites arelinked to potential parent chemicals 
+using the NHANES reports and text mining of PubMed abstracts. 
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf
 
 ## Background
 
@@ -25,22 +33,35 @@ allow the identification of public health priority chemicals via risk-based bioa
 ### Installing
 
 * Getting Started with R Package bayesmarker from the R command line
+<<<<<<< HEAD
 ``` 
+=======
+```
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf
 library(devtools)
 install_github("HumanExposure/bayesmarker")
 ```
 * RStudio provides a menu ‘Install Packages’ under ‘Tools’ tab
 * Load the bayesmarker data and functions
+<<<<<<< HEAD
 ``` 
 library(bayesmarker)
 ```
 * Check what version you are using
 ``` 
+=======
+```
+library(bayesmarker)
+```
+* Check what version you are using 
+```
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf
 packageVersion(bayesmarker)
 ```
 
 ## Authors
 
+<<<<<<< HEAD
 lead package developer Zach Stanfield 
 [@stanfield.zachary@epa.gov]
 
@@ -57,10 +78,32 @@ Kristin Isaacs
 [@isaacs.kristin@epa.gov]
 
 John Wambaugh 
+=======
+lead package developer Zach Stanfield
+[@stanfield.zach@epa.gov]
+
+Woodrow Setzer
+[@setzer.woodrow@epa.gov]
+
+Victoria Hull
+[@Hull.Victoria@epa.gov]
+
+Risa Sayre
+[@sayre.risa@epa.gov]
+
+Kristin Isaacs
+[@isaacs.kristin@epa.gov]
+
+John Wambaugh
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf
 [@wambaugh.john@epa.gov]
 
 
 
 ## License
 
+<<<<<<< HEAD
 License: GPL-3 <https://www.gnu.org/licenses/gpl-3.0.en.html>
+=======
+License: GPL-3 <https://www.gnu.org/licenses/gpl-3.0.en.html>
+>>>>>>> 5d1cb5e57807c898dab17daf0c05bf1bacb4eadf
