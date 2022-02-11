@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # R Package "bayesmarker"
 
 This package provides a modeling approach that uses biomonitoring data and chemical metabolism 
@@ -69,3 +70,6 @@ John Wambaugh
 ## License
 
 License: GPL-3 <https://www.gnu.org/licenses/gpl-3.0.en.html>
+=======
+# CompTox-HumanExposure-bayesmarker
+>>>>>>> 4fe7ac68f51a7d51e9ee5b79a1fb567e0dc0a642
