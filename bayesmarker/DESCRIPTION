@@ -1,0 +1,41 @@
+Package: bayesmarker
+Title: Estimates Chemical Exposure from Biomarker Data Using Bayesian Inference
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Zachary",
+           family = "Stanfield",
+           role = c("aut", "cre"),
+           email = "zachary.stanfield@epa.gov",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: What the package does (one paragraph).
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.2
+Imports: 
+    plyr,
+    foreign,
+    survey,
+    gdata,
+    splines,
+    parallel,
+    doMC,
+    foreach,
+    rjags,
+    random,
+    MASS,
+    coda,
+    ggplot2,
+    methods,
+    logspline,
+    nor1mix,
+    reshape2,
+    prodlim,
+    doParallel
+Depends: 
+    R (>= 2.10)
+Suggests: 
+    rmarkdown,
+    knitr
+VignetteBuilder: knitr

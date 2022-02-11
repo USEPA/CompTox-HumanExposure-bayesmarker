@@ -1,0 +1,283 @@
+---
+title: "Calculate Exposure Inferences:  Examples"
+author:  "Zachary Stanfield"
+date:  "February 11, 2022"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{calculateExpInferences}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+from "Bayesian Inference of Chemical Exposures from NHANES Urine Biomonitoring Data"
+
+Zachary Stanfield, R. Woodrow Setzer, Victoria Hull, Risa R. Sayre, Kristin K. Isaacs, John F. Wambaugh
+
+(Insert Journal Name, issue, data, and page numbers)
+
+(Insert link to DOI)
+
+# Description
+This vignette demonstrates how to utilize the full bayesmarker package pipeline from obtaining the NHANES data (https://wwwn.cdc.gov/nchs/nhanes) to inferring parent chemical exposures.  To limit required compuation time and data requirements,
+the first part of this vignette analyzes a single NHANES cohort (2015-2016) and a single population group.  
+Multiple cohorts can be run individually via loop (see section "Looping over multiple cohorts") or together by combining 
+sampling data (see section "Combining Cohorts").
+
+
+# Quick start:  single cohort and single population
+Obtain chemical exposure estimates for the 2015-2016 NHANES cohort for children aged 0-5 years.
+
+## Prepare for session
+### Load the relevant librarires
+```{r setup1}
+library(bayesmarker)
+```
+
+### Assign needed function inputs 
+The codes_file has specific formatting (see the example file included in this package or the manuscript supplemental data). 
+```{r inputs1}
+cohort <- "15-16"
+codes_file <- "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx"
+save_directory <- "/share/home3/zstanfie/MetaboliteInference/testingAllPhases"
+data_path <- "/share/home3/zstanfie/MetaboliteInference/testingAllPhases"
+```
+
+## Use the bayesmarker package 
+### Obtain and save the raw data
+This call will result in a folder called "2015-2016" at the location "save_directory/rawData/".
+The file will include all need files corresponding to the table in the codes file related to 2015-2016 metabolites.
+```{r 1516children}
+get_NHANES_data(codes_file = codes_file, 
+                cohort = cohort,
+                save_directory = save_directory)
+```
+
+
+### Estimate geometric mean concentrations of the metabolites
+```{r singlePipeline}
+result <- readNHANES(codes_file = codes_file, 
+                       data_path = data_path,  
+                       cohort = cohort,
+                       save_directory = paste(save_directory, "/", cohort, sep = ""))
+  
+# Update the previous result based on closer examination of the metabolite concentration distributions 
+result$Measured <- examine_error(Measured = result$Measured, 
+                                 codes_file = codes_file, 
+                                 data_path = data_path, 
+                                 save_directory = paste(save_directory, "/", cohort, sep = ""))
+  
+# Run the Bayesian model
+subpops <- "0 - 5"
+output <- fitOnlyP(SUBPOP = subpops, Measured = result$Measured, mapping = result$mapping, 
+                   pred.data = result$pred.data, quick = FALSE, cores = 3,
+                   save_directory = paste(save_directory, "/", cohort, sep = ""))
+  
+# Convert to final units and check convergence
+final <- fromMolar(SUBPOP = subpops, Measured = output$Measured, pred.data = output$pred.dat, 
+                            nhanesdata = output$nhanesdata, out.coda3R = output$out.coda3R, doplot = TRUE,
+                            save_directory = paste(save_directory, "/", cohort, sep = ""))
+```
+
+
+## Generate a simple plot !!! Need to update this or plot_subpops
+```{r simplePlot}
+plot_info <- plot_subpops(path_to_lPs = paste(save_directory, "/", cohort, sep = ""), 
+                          SUBPOP = "all")
+```
+
+
+# Looping Over Multiple Cohorts
+Obtain exposure estimates for multiple consecutive years of the NHANES survey for a subset of chemicals to
+observe changes in exposure over time and differences between population groups.
+
+## Prepare for session
+### Load the relevant librarires
+```{r setup2}
+library(bayesmarker)
+```
+
+### Assign needed function inputs 
+The codes_file has specific formatting (see the example file included in this package or the manuscript supplemental data).
+Examine exposure changes for four parabens.
+```{r inputs2}
+cohort <- c("05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
+subset <- c("Ethyl paraben", "n-propyl paraben", "Butyl paraben", "Methyl paraben")
+subset.type <- "Name"
+codes_file <- "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx"
+save_directory <- "/share/home3/zstanfie/MetaboliteInference/testingAllPhases"
+data_path <- "/share/home3/zstanfie/MetaboliteInference/testingAllPhases"
+```
+
+## Use the bayesmarker package 
+### Obtain and save the raw data
+First get all the needed data from the CDC NHANES website. This call will result in a folder for each cohort 
+(name in the long form, for example "2015-2016") at the location "save_directory/rawData/".
+The directory will include all needed files corresponding to the table in the codes file after subsetting by chemical
+and cohorts.
+```{r parabenCohorts}
+get_NHANES_data(codes_file = codes_file, 
+                phases = cohort,
+                save_directory = save_directory)
+```
+
+
+### Estimate geometric mean concentrations of the metabolites
+Obtain estimates per cohort using a loop over the main pipeline.
+```{r indivParabens}
+for (i in 1:length(cohort)){
+  
+  print(paste("Starting computations for cohort", cohort[i], sep = ""))
+  
+  # Read NHANES
+  print("Starting readNHANES function")
+  result <- readNHANES(codes_file = codes_file, 
+                       data_path = data_path,  
+                       cohort = cohort[i], subset = subset, subset.type = subset.type,
+                       save_directory = paste(save_directory, "/", cohort[i], sep = ""))
+  
+  # Add needed columns to Measured
+  print("Starting examine_error function")
+  result$Measured <- examine_error(Measured = result$Measured, 
+                                   codes_file = codes_file, 
+                                   data_path = data_path, 
+                                   save_directory = paste(save_directory, "/", cohort[i], sep = ""))
+  
+  # Run the model
+  print("Starting fitOnlyP function")
+  subpops <- unique(result$Measured$subpop)
+  output <- c()
+  # There are 10 population groups, so this step is computationally intensive. If a speedup is desired,
+  # can run this in parallel using either foreach or mclapply.
+  output <- list()
+  for (j in 1:length(subpops)){
+    output[[j]] <- fitOnlyP(SUBPOP = subpops[j], Measured = result$Measured, mapping = result$mapping, 
+                       pred.data = result$pred.data, quick = FALSE, cores = 3,
+                       save_directory = paste(save_directory, "/", cohort[i], sep = ""))
+  }
+  
+  # Convert to final units and check convergence
+  print("Starting fromMolar function")
+  final <- lapply(1:length(subpops),
+                  FUN = function(j) {
+                    fromMolar(SUBPOP = subpops[j], Measured = output[[j]]$Measured, pred.data = output[[j]]$pred.dat, 
+                              nhanesdata = output[[j]]$nhanesdata, out.coda3R = output[[j]]$out.coda3R, doplot = TRUE,
+                              save_directory = paste(save_directory, "/", cohort[i], sep = ""))
+                  })
+}
+```
+
+## Retrieve results and generate time series plots
+The MCMC chains are named in the form "save_directory/cohort/lPsamps-gm_kg_day_subpop_year-month-day.RData".
+
+
+
+# Combining Cohorts
+Providing multiple cohorts to the readNHANES function will result in combination of the survey data from 
+those cohorts. This increases the sample size, leading to greater statistical power, which may result
+in reduced uncertainty in the final exposure estimates. This section compares phthalte exposures to all 
+individuals in the 2000s compared to the 2010s.
+
+## Prepare for session
+### Load the relevant librarires
+```{r setup3}
+library(bayesmarker)
+library(xlsx)
+```
+
+### Assign needed function inputs 
+The codes_file has specific formatting (see the example file included in this package or the manuscript supplemental data).
+Examine exposure changes for phthalates.
+```{r inputs3}
+samples <- list()
+samples[[1]] <- c("01-02", "03-04", "05-06", "07-08", "09-10")
+samples[[2]] <- c("11-12", "13-14", "15-16")
+names(samples) <- c("2000s", "2010s")
+save_directory <- "/share/home3/zstanfie/MetaboliteInference/testingAllPhases"
+data_path <- "/share/home3/zstanfie/MetaboliteInference/testingAllPhases"
+```
+
+### Modify the codes file
+To do a comparison across decades, a chemical needs to be measured in at least one cohort of each decade.
+Then we reduce metabolites to just phthalates.
+```{r modCodesFile}
+# Ensure data for each decade
+convtbl <- read.xls("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", as.is = TRUE)
+convtbl <- convtbl[!convtbl$recent_sample == "99-00", ] # Not in either decade
+chems <- unique(convtbl$CAS)
+indkeep <- logical(length = length(chems))
+for (i in 1:length(chems)){
+  presPhase <- convtbl$recent_sample[convtbl$CAS == chems[i]]
+  print(chems[i])
+  print(presPhase)
+  if (length(intersect(presPhase, samples[[1]])) > 0 & length(intersect(presPhase, samples[[2]])) > 0){
+    indkeep[i] <- TRUE
+    print("keep")
+  } else {
+    indkeep[i] <- FALSE
+    print("don't keep")
+  }
+}
+convtbl <- convtbl[convtbl$CAS %in% chems[indkeep],]
+# Remove non-phthalates
+convtbl <- convtbl[grep("phthalate", convtbl$Name),]
+# Update the weights table to match
+keepFile <- paste(unique(convtbl$NHANESfile), ".XPT", sep = "")
+wtvars <- read.xls("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 2, as.is = TRUE)
+wtvars <- wtvars[wtvars$file %in% keepFile,]
+# Write Files
+map <- read.xls("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 3, as.is = TRUE)
+write.xlsx(convtbl, file = "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_forDecadeComp.xlsx", sheetName = "codes")
+write.xlsx(wtvars, file = "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_forDecadeComp.xlsx", 
+           sheetName = "weights", append = TRUE)
+write.xlsx(map, file = "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_forDecadeComp.xlsx", 
+           sheetName = "map", append = TRUE)
+codes_file <- "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_forDecadeComp.xlsx"
+```
+
+## Use the bayesmarker package 
+### Obtain and save the raw data
+```{r phthalateDecadeData}
+get_NHANES_data(codes_file = codes_file, 
+                cohort = cohort,
+                save_directory = save_directory)
+```
+
+### Loop over decades and run the main pipeline
+```{r decadeMain}
+for (i in 1:length(samples)){
+  
+  print(paste("Starting computations for ", names(samples)[i], sep = ""))
+  
+  # Read NHANES
+  #print("Starting readNHANES function")
+  result <- readNHANES(codes_file = codes_file, 
+                       data_path = data_path,  
+                       cohort = unname(samples[[i]]),
+                       save_directory = paste(save_directory, "/", names(samples)[i], sep = ""))
+  
+  # Add needed columns to Measured
+  print("Starting examine_error function")
+  result$Measured <- examine_error(Measured = result$Measured, 
+                                   codes_file = codes_file, 
+                                   data_path = data_path, 
+                                   save_directory = paste(save_directory, "/", names(samples)[i], sep = ""))
+  
+  # Run the Bayesian inference.
+  print("Starting fitOnlyP function")
+  subpops <- "Total"
+  output <- fitOnlyP(SUBPOP = subpops, Measured = result$Measured, mapping = result$mapping, 
+                       pred.data = result$pred.data, quick = FALSE, cores = 3,
+                       save_directory = paste(save_directory, "/", names(samples)[i], sep = ""))
+
+  
+  # Convert to final units and check convergence
+  print("Starting fromMolar function")
+  final <- fromMolar(SUBPOP = subpops, Measured = output$Measured, pred.data = output$pred.dat, 
+                              nhanesdata = output$nhanesdata, out.coda3R = output$out.coda3R, doplot = TRUE,
+                              codes_file = codes_file,
+                              save_directory = paste(save_directory, "/", names(samples)[i], sep = ""))
+}
+```
+
+## Make a plot
+
