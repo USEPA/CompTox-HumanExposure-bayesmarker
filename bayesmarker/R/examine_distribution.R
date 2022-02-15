@@ -22,7 +22,7 @@
 #' @import foreach
 #' @importFrom parallel mclapply
 #' @importFrom stats vcov
-#' @importFrom gdata read.xls
+#' @importFrom readxl read_excel
 #' @importFrom doMC registerDoMC
 #'
 #' @return Measured: same as the input, but with 4 additional columns.
@@ -90,8 +90,8 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
 
   ## convtbl was constructed manually, starting with an earlier list of NHANES urine
   ## products. Age cutoffs were based on the highest age group reported in the 4th report.
-  convtbl <- read.xls(NHANEScodes,as.is=TRUE)
-  wtvars <- read.xls(NHANEScodes, sheet=2, as.is=TRUE)
+  convtbl <- as.data.frame(read_excel(NHANEScodes, sheet = 1))
+  wtvars <- as.data.frame(read_excel(NHANEScodes, sheet = 2))
 
   # Reduce these 2 tables to include cohorts only in Measured
   convtbl <- convtbl[convtbl$recent_sample %in% phases,]

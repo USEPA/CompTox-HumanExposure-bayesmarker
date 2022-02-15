@@ -13,7 +13,7 @@
 #'                       NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.
 #'
 #' @return
-#' @importFrom gdata read.xls
+#' @importFrom readxl read_excel
 #' @importFrom utils download.file
 #' @export
 #'
@@ -27,9 +27,9 @@ get_NHANES_data <- function(codes_file = NULL, save_directory = NULL) {
     stop()
   }
 
-  codes <- read.xls(codes_file, as.is = TRUE)
-  weights <- read.xls(codes_file, sheet = 2, as.is = TRUE)
-  mapping <- read.xls(codes_file, sheet = 3, as.is = TRUE)
+  codes <- as.data.frame(read_excel(codes_file, sheet = 1))
+  weights <- as.data.frame(read_excel(codes_file, sheet = 2))
+  mapping <- as.data.frame(read_excel(codes_file, sheet = 3))
 
 
   # Generate list of needed laboratory files (has metaboite concentration measurements)

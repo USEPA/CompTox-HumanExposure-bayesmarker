@@ -181,6 +181,7 @@ individuals in the 2000s compared to the 2010s.
 ### Load the relevant librarires
 ```{r setup3}
 library(bayesmarker)
+library(readxl)
 library(xlsx)
 ```
 
@@ -201,7 +202,7 @@ To do a comparison across decades, a chemical needs to be measured in at least o
 Then we reduce metabolites to just phthalates.
 ```{r modCodesFile}
 # Ensure data for each decade
-convtbl <- read.xls("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", as.is = TRUE)
+convtbl <- as.data.frame(read_excel("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 1))
 convtbl <- convtbl[!convtbl$recent_sample == "99-00", ] # Not in either decade
 chems <- unique(convtbl$CAS)
 indkeep <- logical(length = length(chems))
@@ -222,10 +223,10 @@ convtbl <- convtbl[convtbl$CAS %in% chems[indkeep],]
 convtbl <- convtbl[grep("phthalate", convtbl$Name),]
 # Update the weights table to match
 keepFile <- paste(unique(convtbl$NHANESfile), ".XPT", sep = "")
-wtvars <- read.xls("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 2, as.is = TRUE)
+wtvars <- as.data.frame(read_excel("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 2))
 wtvars <- wtvars[wtvars$file %in% keepFile,]
 # Write Files
-map <- read.xls("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 3, as.is = TRUE)
+map <- as.data.frame(read_excel("/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 3))
 write.xlsx(convtbl, file = "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_forDecadeComp.xlsx", sheetName = "codes")
 write.xlsx(wtvars, file = "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_forDecadeComp.xlsx", 
            sheetName = "weights", append = TRUE)

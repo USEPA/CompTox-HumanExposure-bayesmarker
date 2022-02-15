@@ -18,7 +18,7 @@
 #' @param save_directory String providing the directory in which to save the NHANES data files.  If left as the default,
 #'                       NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.
 #'
-#' @importFrom gdata read.xls
+#' @importFrom readxl read_excel
 #' @importFrom parallel mclapply
 #' @importFrom utils write.csv
 #' @importFrom prodlim row.match
@@ -49,8 +49,8 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
 
   ## convtbl was constructed manually, starting with an earlier list of NHANES urine
   ## products. Age cutoffs were based on the highest age group reported in the 4th report.
-  convtbl <- read.xls(NHANEScodes, as.is = TRUE)
-  wtvars <- read.xls(NHANEScodes, sheet = 2, as.is = TRUE)
+  convtbl <- as.data.frame(read_excel(NHANEScodes, sheet = 1))
+  wtvars <- as.data.frame(read_excel(NHANEScodes, sheet = 2))
 
   cycles <- c("99-00", "01-02", "03-04", "05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
   if (length(cohort) == 1){
@@ -240,7 +240,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   ## Build an object for the urine products with
   ## name, cas, sample, and quantiles, which should have names
   ## Value50 LCL50 UCL50
-  NHANES.parent.metabolite.mapping <- read.xls(codes_file, sheet=3, as.is = TRUE)
+  NHANES.parent.metabolite.mapping <- as.data.frame(read_excel(codes_file, sheet=3))
 
   # Processing: Data check
   # Remove all rows without a MW
