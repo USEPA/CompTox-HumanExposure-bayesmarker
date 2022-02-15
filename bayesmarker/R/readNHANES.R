@@ -208,7 +208,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
                                     bodywtfile=bwtfiles[names(datafiles)[i]],
                                     creatfile=creatfiles[names(datafiles)[i]],
                                     Q=c(50),
-                                    codes_talbe = convtbl,
+                                    codes_table = convtbl,
                                     code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
                                               codename="NHANEScode",CAS="CAS",chemname="Name"),
                                     LODfilter=FALSE,
@@ -349,10 +349,10 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   ## ----------------------------------------------------------------------------------
   ## Add Use categories to pred.data
   ## Near field: Fragrance, food additive, consumer use, personal care product.
-  indx <- match(pred.data$CAS, UseTable$CASRN)
-  Uses <- UseTable[indx,]
-  Uses$NearField <- as.numeric(with(Uses, FRAGRANCE | FOOD.ADDITIVE | CONSUMER.USE | PERSONAL.CARE.PRODUCT | PHARMACEUTICAL))
-  pred.data$NearField <- Uses$NearField
+  #indx <- match(pred.data$CAS, UseTable$CASRN)
+  #Uses <- UseTable[indx,]
+  #Uses$NearField <- as.numeric(with(Uses, FRAGRANCE | FOOD.ADDITIVE | CONSUMER.USE | PERSONAL.CARE.PRODUCT | PHARMACEUTICAL))
+  #pred.data$NearField <- Uses$NearField
 
 
   ## ----------------------------------------------------------------------------------
