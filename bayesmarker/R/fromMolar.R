@@ -30,6 +30,7 @@
 #'
 #'
 #' @import ggplot2
+#' @importFrom readxl read_excel
 #' @importFrom coda varnames gelman.diag heidel.diag
 #'
 #'
@@ -128,7 +129,7 @@ fromMolar <- function(SUBPOP, Measured, pred.data, nhanesdata, out.coda3R, doplo
                                                   format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
 
   # Same for metabolites.  Get the molecular weights from the metabolite map in the codes file
-  map <- read.xls(codes_file, sheet=3, as.is = TRUE)
+  map <- as.data.frame(read_excel(codes_file, sheet=3))
   ind <- match(Measured$CAS, map$CAS.1)
   MWs <- map$MW.1[ind]
   adjust <- log(MWs) - log(1e6)

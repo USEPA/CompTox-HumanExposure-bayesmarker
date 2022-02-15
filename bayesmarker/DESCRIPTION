@@ -32,7 +32,8 @@ Imports:
     nor1mix,
     reshape2,
     prodlim,
-    doParallel
+    doParallel,
+    readxl
 Depends: 
     R (>= 2.10)
 Suggests: 
