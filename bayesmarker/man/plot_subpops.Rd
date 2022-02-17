@@ -6,7 +6,8 @@
 \usage{
 plot_subpops(
   path_to_lPs = NULL,
-  SUBPOP = "all",
+  cohort = NULL,
+  SUBPOP = "Total",
   save_output = FALSE,
   save_directory = ".",
   print_plot = FALSE
@@ -16,6 +17,9 @@ plot_subpops(
 \item{path_to_lPs}{String representing the location of the lPsamps outputs.
 All subpopulations that are desired in the plot need to
 be within the directory provided.}
+
+\item{cohort}{A string indicating one of the NHANES cohorts or phases (e.g.,
+"01-02" or "09-10")}
 
 \item{SUBPOP}{A character vector of the subpopulations to be plotted.  These
 must exactly match the subpopulations contained in the original

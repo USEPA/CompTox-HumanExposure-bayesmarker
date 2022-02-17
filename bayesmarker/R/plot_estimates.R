@@ -7,6 +7,8 @@
 #' @param path_to_lPs String representing the location of the lPsamps outputs.
 #'                    All subpopulations that are desired in the plot need to
 #'                    be within the directory provided.
+#' @param cohort A string indicating one of the NHANES cohorts or phases (e.g.,
+#'               "01-02" or "09-10")
 #' @param SUBPOP A character vector of the subpopulations to be plotted.  These
 #'               must exactly match the subpopulations contained in the original
 #'               codes_file.
@@ -28,19 +30,18 @@
 #' @export
 #'
 #'
-plot_subpops <- function(path_to_lPs = NULL, SUBPOP = "all", save_output = FALSE, save_directory = ".", print_plot = FALSE) {
+plot_subpops <- function(path_to_lPs = NULL, cohort = NULL, SUBPOP = "Total", save_output = FALSE, save_directory = ".", print_plot = FALSE) {
 
-  # Reference for population groups
+  path_to_lPs = paste(save_directory, "/", cohort, sep = "")
+
+  # Valid subpop?
   subpops <- c("Total", "Male", "Female", "0 - 5", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
                "ReproAgeFemale", "BMI <= 30", "BMI > 30")
-  names(subpops) <- c("Total", "Male", "Female", "0 - 5", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
-                      "ReproAgeFemale", "BMI_le_30", "BMI_gt_30")
+  try(if(!SUBPOP %in% subpops) stop(paste("please supply one of the following possible subpops:", subpops, sep = "")))
 
-  # Subpops the user wants plotted
-  if (SUBPOP != "all"){
-    ind <- SUBPOP %in% subpops
-    subpops <- subpops[ind]
-  }
+  # Valid cohort?
+  cohorts <- c("99-00", "01-02", "03-04", "05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
+  try(if(!cohort %in% cohorts) stop(paste("please supply one of the following possible cohorts:", cohorts, sep = "")))
 
   print("Retrieving file names for the subpopulations:")
   print(unname(subpops))
@@ -49,57 +50,52 @@ plot_subpops <- function(path_to_lPs = NULL, SUBPOP = "all", save_output = FALSE
   if (is.null(path_to_lPs)){
     files <- list.files(path = ".", pattern = "lPsamps-gm_kg_day")
   } else {
-    files <- list.files(path = file.path(".", path_to_lPs), pattern = "lPsamps-gm_kg_day")
+    files <- list.files(path = path_to_lPs, pattern = "lPsamps-gm_kg_day")
   }
 
   # Read in files and build data.frame
-  for (i in 1:length(subpops)){
-    load(files[grep(subpops[i], files)])
-    samps <- as.matrix(lPsampsgm)
-    ind <- grep("lP\\[", colnames(samps))
-    result.med <- apply(samps[,ind], 2, mean)
-    result.bar <- mean(apply(samps[,ind], 1, mean))
-    dta <- data.frame(row.names(samps), exp(result.med))
-    colnames(dta) <- c("CAS", subpops[i])
-    if (i > 1){
-      dta.1 <- merge(dta.1, dta, by = "CAS", all.x = TRUE)
-    } else {
-      dta.1 <- dta
-    }
-  }
+  load(paste(path_to_lPs, files[grep(paste("_", SUBPOP, sep = ""), files)], sep = ""))
+  samps <- as.matrix(lPsampsgm)
+  result.med <- apply(samps, 2, mean)
+  result.bar <- mean(apply(samps, 1, mean))
+  # Get 95th Percentiles
+  result.CI <- t(apply(samps, 2, function(x) quantile(x, probs = c(0.0275, 0.975))))
+  dta <- data.frame(colnames(samps), exp(result.med))
+  dta.low <- data.frame(colnames(samps), exp(result.CI[,1]))
+  dta.up <- data.frame(colnames(samps), exp(result.CI[,2]))
+  colnames(dta) <- c("CAS", SUBPOP)
+  colnames(dta.low) <- c("CAS", paste(SUBPOP, "_low95", sep = ""))
+  colnames(dta.up) <- c("CAS", paste(SUBPOP, "_up95", sep = ""))
 
-  ####################################################
-  #load("MCMCdata.RData")
-  #dta.1 <- cbind("Name" = pred.data$Name, dta.1)
-  #write.csv(dta.1, file = "./updatedPipeline/lPests_mgkgday_bySubpop.csv", row.names = FALSE)
-  #rm(Bstart, Bstop, F, index, Measured, NBranches, Ndelta, Phi, Uses, mapping)
-  ######################################################
+  # Combine
+  df <- data.frame("Chemical" = dta$CAS, "Median" = dta[,2], "low95" = dta.low[,2],
+                   "up95" = dta.up[,2])
 
   # Sort from largest to smallest predicted exposure
-  ind <- apply(dta.1[2:length(subpops)], 1, function(x) max(x, na.rm = TRUE))
-  sorted <- sort(ind, decreasing = TRUE, index.return = TRUE)
-
-  exposureDF <- melt(dta.1, id.vars="CAS", value.name="loggm", variable.name="Demo")
+  sorted <- sort(df[,2], decreasing = TRUE, index.return = TRUE)
 
   # Complete sort
-  exposureDF$CAS <- factor(exposureDF$CAS, levels = levels(exposureDF$CAS)[sorted$ix])
+  df$Chemical <- as.factor(df$Chemical)
+  df$Chemical <- factor(df$Chemical, levels = levels(df$Chemical)[sorted$ix])
 
   # Generate plot
-  p <- ggplot(exposureDF, aes(x=CAS, y=loggm, group=Demo, color=Demo)) + geom_point() +
+  p <- ggplot(df, aes(x=Chemical, y=Median)) +
+    geom_point() +
+    geom_errorbar(aes(ymin = low95, ymax = up95), width = 0.1) +
     ylab("Predicted Exposure (mg/kg BW/day)") +
-    scale_y_log10(limits = c(1e-10, 10)) +
-    theme_set(theme_gray(base_size = 18)) +
+    scale_y_log10() +
+    theme_set(theme_gray(base_size = 14)) +
     theme(axis.text.x=element_text(angle=90, hjust=1))
 
   if (print_plot) {
     print(p)
   }
 
-  result <- list(exposureDF = exposureDF,
+  result <- list(df = df,
                  Plot = p)
 
   if (save_output) {
-    save(result, file=file.path(save_directory, paste("CompareSubpops_", SUBPOP, "_",
+    save(result, file=file.path(save_directory, paste("Exposures_", cohort, "_", SUBPOP, "_",
                                       format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
   }
 
