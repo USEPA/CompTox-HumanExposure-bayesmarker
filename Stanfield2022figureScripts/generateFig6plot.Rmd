@@ -1,0 +1,166 @@
+---
+title: "Compare Child Populations with All Individuals (Fig. 6)"
+author: "Zachary Stanfield"
+date: "January 11, 2022"
+output: html_document
+---
+
+from "Bayesian Inference of Chemical Exposures from NHANES Urine Biomonitoring Data"
+
+Zachary Stanfield, R. Woodrow Setzer, Victoria Hull, Risa R. Sayre, Kristin K. Isaacs, John F. Wambaugh
+
+(Insert Journal Name, issue, data, and page numbers)
+
+(Insert link to DOI)
+
+# Description
+This file uses the inferred exposures for parent chemicals of NHANES biomarkers that was obtained using
+the bayesmarker package to compare exposures between young children (0 - 5 years) and children (6 - 11 
+years) to all survey participants using the 2015-2016 cohort data.
+
+## Prepare for session
+### Load relevant libraries
+```{r setup}
+library("coda")
+library(reshape2)
+library(ggplot2)
+library(mratios)
+```
+
+### Declare some needed data objects
+```{r dataObjs}
+subpops <- c("0 - 5", "6 - 11 years", "Total")
+names(subpops) <- c("0 - 5", "6 - 11 years", "Total")
+
+path <- "./testingAllPhases/15-16"
+
+map <- read.xls("NHANEScodes_ZS_2020-12-15.xlsx", sheet = 3)
+classTable <- read.xls("allPhasesAllChems_ChemClass.xlsx", sheet = 1)
+```
+
+## Collect the data
+If not already generated, run the main vignette for the 2015-2016 cohort for all metabolites and the 3 above "subpops"
+```{r collectData}
+alldata <- list()
+for (i in 1:length(subpops)){
+  file <- paste(path, "/", list.files(path = path, pattern = paste("lPsamps-gm_kg_day_", subpops[i], sep = "")), sep = "")
+  file <- file[grep("2021-05-11", file)]
+  load(file)
+  samps <- as.matrix(lPsampsgm)
+  alldata[[i]] <- exp(samps)
+  names(alldata)[i] <- subpops[i]
+}
+```
+
+## Calculate the fold changes
+```{r calcFC}
+df1 <- data.frame("Chemical" = colnames(alldata[[1]]), "FC" = NA, "lowCI" = NA, "upCI" = NA, "p.value" = NA)
+df2 <- df1
+numsamps <- dim(alldata[[1]])[1]
+for (i in 1:dim(df1)[1]){
+  temp <- ttestratio(alldata$`0 - 5`[sample.int(numsamps, 2000),i], alldata$Total[sample.int(numsamps, 2000),i], 
+                     alternative = "two.sided", conf.level = 0.95)
+  df1[i,c("FC", "lowCI", "upCI", "p.value")] <- c(temp$estimate["x/y"], temp$conf.int[1:2], temp$p.value)
+  temp <- ttestratio(alldata$`6 - 11 years`[sample.int(numsamps, 2000),i], alldata$Total[sample.int(numsamps, 2000),i], 
+                     alternative = "two.sided", conf.level = 0.95)
+  df2[i,c("FC", "lowCI", "upCI", "p.value")] <- c(temp$estimate["x/y"], temp$conf.int[1:2], temp$p.value)
+}
+```
+
+
+## Prepare the data for the plot
+```{r prepData}
+# One chemical has a number of outliers, remove this
+df1 <- df1[-grep("91-20-3", df1$Chemical),]
+df2 <- df2[-grep("91-20-3", df2$Chemical),]
+
+# Record order for largest FC for 0-5:Total
+sort_ind <- order(df1$FC, decreasing = TRUE)
+
+# Prepare for final data frame
+df1 <- cbind(df1, "Comparison" = "0-5:Total")
+df2 <- cbind(df2, "Comparison" = "6-11:Total")
+df <- rbind(df1, df2)
+
+# Add chemical class
+# Propagate reported (by NHANES) metabolite class to the parent chemicals using
+#the metabolite map
+map <- map[map$CAS %in% df1$Chemical,]  
+map$ChemClass <- classTable$Column4[match(map$CAS.1, classTable$Column1)]
+
+# Shorten the class names for a more concise plot
+map$ChemClass <- as.character(map$ChemClass)
+map$ChemClass[map$ChemClass == "Carbamate Pesticide Metabolites"] <- "Carbamate Pesticides"
+map$ChemClass[map$ChemClass == "Flame Retardant Metabolite"] <- "Flame Retardant"
+map$ChemClass[map$ChemClass == "Fungicides and Metabolites"] <- "Fungicides"
+map$ChemClass[map$ChemClass == "Herbicides and Metabolites"] <- "Herbicides"
+map$ChemClass[map$ChemClass == "Insect Repellent and Metabolites"] <- "Insect Repellent"
+map$ChemClass[map$ChemClass == "Organochlorine Pesticide Metabolites"] <- "Organochlorine Pesticides"
+map$ChemClass[map$ChemClass == "Personal Care and Consumer Product Chemicals"] <- "Personal Care/Consumer Product"
+map$ChemClass[map$ChemClass == "Phthalate and Phthalate Alternative Metabolites"] <- "Phthalates"
+map$ChemClass[map$ChemClass == "Phytoestrogens and Metabolites"] <- "Phytoestrogens"
+map$ChemClass[map$ChemClass == "Polycyclic Aromatic Hydrocarbon Metabolites"] <- "Polycyclic Aromatic Hydrocarbons"
+map$ChemClass[map$ChemClass == "Pyrethroid Metabolites"] <- "Pyrethroids"
+map$ChemClass[map$ChemClass == "Volatile Organic Compound Metabolites"] <- "Volatile Organic Compounds"
+
+# If a parent chemical has metabolites from more than one class, label NA (unknown)
+df$ChemicalClass <- NA
+tmp <- list()
+for (i in 1:dim(df)[1]){
+  tmp[[i]] <- unique(as.character(map$ChemClass[as.character(map$CAS) == as.character(df$Chemical)[i]]))
+  if (length(tmp[[i]]) == 1){
+    df$ChemicalClass[i] <- tmp[[i]]  
+  }
+}
+
+# Add chemical name
+df$Name <- map$Name[match(df$Chemical, map$CAS)]
+df$Name <- droplevels(df$Name)
+df$Name <- ordered(df$Name, levels = as.character(df$Name[df$Comparison == "0-5:Total"])[sort_ind])
+
+# Offer space for wrapping of facet label
+df$ChemicalClass[df$ChemicalClass == "Perchlorate and Other Anions"] <- "Per- chlorate and Other Anions"
+```
+
+
+# Make the final plot and save the data for supplement
+```{r plot}
+pdf(file = "FCs_DiffTotalvs0to5vs6to11_withCIs_2021-10-14.pdf", width = 16, height = 10)
+ggplot(df, aes(Name, FC, fill = Comparison)) +
+  geom_bar(stat = "identity", position = position_dodge(0.9)) +
+  geom_errorbar(aes(ymin = lowCI, ymax = upCI), width = 0.2, position = position_dodge(0.9)) +
+  scale_fill_manual(values = c("#E69F00", "#999999")) +
+  facet_grid(~Class, scales = "free_x", space = "free_x", labeller = labeller(Class = label_wrap_gen(10))) +
+  ylab("Fold Change") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  ggtitle("Exposure Fold Change Comparison Between the Total Population and Children aged 0-5 and 6-11") +
+  theme(text = element_text(size = 17)) +
+  theme(axis.title.x = element_blank()) +
+  theme(axis.text.x = element_text(size = 13, angle = 60, hjust = 1)) +
+  theme(strip.text.x = element_text(size = 12)) +
+  theme(panel.spacing = unit(0.5, "lines"))
+dev.off()
+
+# Save data for manuscript
+ind <- match(df$Chemical, map$CAS)
+df <- cbind("DTXSID" = map$DTXSID[ind], df)
+df <- df[,c(1,2,9,8,7,3:5)]
+colnames(df)[2] <- "CAS"
+write.table(df, file = "bayesmarkerPaper_Fig6_data.txt", sep = "\t", row.names = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
