@@ -82,7 +82,7 @@ final <- fromMolar(SUBPOP = subpops, Measured = output$Measured, pred.data = out
 ## Generate a simple plot !!! Need to update this or plot_subpops
 ```{r simplePlot}
 plot_info <- plot_subpops(path_to_lPs = paste(save_directory, "/", cohort, sep = ""), 
-                          SUBPOP = "all")
+                          SUBPOP = subpops, print_plot = TRUE)
 ```
 
 
