@@ -1,0 +1,271 @@
+---
+title: "Exposure Heat Map: Log2(Fold Change) compared to the total population (Fig. 4)"
+author: "Zachary Stanfield"
+date: "January 6, 2022"
+output: html_document
+---
+
+from "Bayesian Inference of Chemical Exposures from NHANES Urine Biomonitoring Data"
+
+Zachary Stanfield, R. Woodrow Setzer, Victoria Hull, Risa R. Sayre, Kristin K. Isaacs, John F. Wambaugh
+
+(Insert Journal Name, issue, data, and page numbers)
+
+(Insert link to DOI)
+
+# Description
+This file uses the inferred exposures for parent chemicals of NHANES biomarkers that was obtained using
+the bayesmarker package to generate a heatmap that shows how exposure in various population groups compares
+to all survey participants.
+
+## Prepare for session
+### Load relevant libraries
+```{r setup}
+library(ggplot2)
+library(reshape2)
+library(gdata)
+library(RColorBrewer)
+library(colorRamps)
+library(pheatmap)
+```
+
+### Declare some needed data objects
+```{r dataObjs}
+# Reference for population groups
+subpops <- c("Total", "Male", "Female", "0 - 5", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
+             "ReproAgeFemale", "BMI <= 30", "BMI > 30")
+names(subpops) <- c("Total", "Male", "Female", "0 - 5", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
+                    "ReproAgeFemale", "BMI_le_30", "BMI_gt_30")
+# Cohorts
+phases <- c("99-00", "01-02", "03-04", "05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
+path_to_lPs <- "testingAllPhases"
+map <- read.xls("NHANEScodes_ZS_2020-12-15.xlsx", as.is = TRUE, sheet = 3)
+```
+
+## Obtain desired data from saved output of bayesmarker runs  
+Select the most recent cohort for each parent chemical from the full set of individual cohort runs.
+If this data is not already available, users can alter their input file to include just the latest
+cohort row for each individual biomarker before working through the bayesmarker pipeline (see the 
+vignette calculateExposureInferences for the pipeline).
+
+```{r readLPs}
+# Subset the types of population groups here if desired
+SUBPOP <- "all"
+if (SUBPOP != "all"){
+  ind <- SUBPOP %in% subpops
+  subpops <- subpops[ind]
+}
+
+# Read in the exposure estimates for each cohort
+dta.2 <- c()
+for (j in 1:length(phases)){
+
+  # Obtain file names for lPsamps
+  if (is.null(path_to_lPs)){
+    files <- list.files(path = ".", pattern = "lPsamps-gm_kg_day")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  } else {
+    path <- file.path(".", path_to_lPs, phases[j])
+    files <- paste(path, "/", list.files(path = path, pattern = "lPsamps-gm_kg_day"), sep = "")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  }
+  
+  # Read in files and build data.frame
+  for (i in 1:length(subpops)){
+    if (length(grep(paste("_", subpops[i], sep = ""), files)) == 0){
+      # For cases like "0 - 5" supbop not in other phases.
+      # Ok to call dta.1 here b/c 0-5 is not 1st in subpops
+      chems <- unique(dta.1$CAS)
+      dta <- data.frame(matrix(data = NA, nrow = length(chems), ncol = 2))
+      colnames(dta) <- c("CAS", subpops[i])
+      row.names(dta) <- chems
+      dta.1 <- merge(dta.1, dta, by = "CAS", all.x = TRUE)
+    } else {
+      load(files[grep(paste("_", subpops[i], sep = ""), files)])
+      samps <- as.matrix(lPsampsgm)
+      result.med <- apply(samps, 2, mean)
+      result.bar <- mean(apply(samps, 1, mean))
+      dta <- data.frame(colnames(samps), exp(result.med))
+      colnames(dta) <- c("CAS", subpops[i])
+      if (i > 1){
+        dta.1 <- merge(dta.1, dta, by = "CAS", all.x = TRUE)
+      } else {
+        dta.1 <- dta
+      }
+    }
+  }
+  dta.2 <- rbind(cbind(dta.1, "Phase" = rep(phases[j], dim(dta.1)[1])), dta.2)
+}
+
+# Get the most recent estimate for each chemical
+parents <- as.character(unique(dta.2$CAS))
+dta.2$CAS <- as.character(dta.2$CAS)
+dta.2$Phase <- as.character(dta.2$Phase)
+# Function to get the newest row for each chemical
+getNewestPred <- function(parent, phases, data){
+  availphase <- as.character(unique(dta.2$Phase[dta.2$CAS == parent]))
+  ind <- max(match(availphase, phases))
+  output <- dta.2[dta.2[,"CAS"] == parent & dta.2[,"Phase"] == phases[ind],]
+  return(output)
+}
+final <- as.data.frame(t(sapply(parents, getNewestPred, phases = phases, data = dta.2)))
+# Add preferred name and DTXSID
+indP <- match(final$CAS, map$CAS)
+final <- cbind("DTXSID" = map$DTXSID[indP], "Name" = map$Name[indP], final)
+final <- apply(final, 2, as.character)
+write.table(final, file = paste("ParentExpEsts_MostRecent_", format(Sys.time(), "%Y-%m-%d"), ".txt", sep = ""),
+            quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+## Prepare main data object
+```{r dataPrep}
+#lPs <- read.delim(file = "ParentExpEsts_MostRecent_2021-06-23.txt", header = TRUE, sep = "\t")
+lPs <- final
+colnames(lPs)[-c(1:3,15)] <- c("Total", "Males", "Females", "Age.0.5", "Age.6.11", "Age.12.19", "Age.20.65", 
+                               "Age.GT65", "ReproAgeFemale", "BMI <= 30", "BMI > 30")
+
+# Add chemical class
+map <- map[map$CAS %in% lPs$CAS,]  # 260 rows
+map <- map[,c(2,3,4,7,8,9)]
+classTable <- read.xls("allPhasesAllChems_ChemClass.xlsx", sheet = 1)
+map$CAS.1 <- gsub(" ", "", map$CAS.1)
+map$ChemClass <- apply(map, 1, function(x) classTable$Column4[match(x[5], classTable$Column1)])
+
+# Shorten the class names for a concise plot
+map$ChemClass <- as.character(map$ChemClass)
+map$ChemClass[map$ChemClass == "Carbamate Pesticide Metabolites"] <- "Carbamate Pesticides"
+map$ChemClass[map$ChemClass == "Flame Retardant Metabolite"] <- "Flame Retardant"
+map$ChemClass[map$ChemClass == "Fungicides and Metabolites"] <- "Fungicides"
+map$ChemClass[map$ChemClass == "Herbicides and Metabolites"] <- "Herbicides"
+map$ChemClass[map$ChemClass == "Insect Repellent and Metabolites"] <- "Insect Repellent"
+map$ChemClass[map$ChemClass == "Organochlorine Pesticide Metabolites"] <- "Organochlorine Pesticides"
+map$ChemClass[map$ChemClass == "Personal Care and Consumer Product Chemicals"] <- "Personal Care/Consumer Product"
+map$ChemClass[map$ChemClass == "Phthalate and Phthalate Alternative Metabolites"] <- "Phthalates"
+map$ChemClass[map$ChemClass == "Phytoestrogens and Metabolites"] <- "Phytoestrogens"
+map$ChemClass[map$ChemClass == "Polycyclic Aromatic Hydrocarbon Metabolites"] <- "Polycyclic Aromatic Hydrocarbons"
+map$ChemClass[map$ChemClass == "Pyrethroid Metabolites"] <- "Pyrethroids"
+map$ChemClass[map$ChemClass == "Volatile Organic Compound Metabolites"] <- "Volatile Organic Compounds"
+
+tmp <- as.character(map$ChemClass[match(lPs$CAS, map$CAS)])
+na.ind <- is.na(tmp)  # Only 3 
+tmp <- tmp[!na.ind]
+lPs <- lPs[!na.ind,]
+
+lPs$Name <- substr(lPs$Name, 0, 25)
+
+df <- as.data.frame(matrix(data = NA, nrow = dim(lPs)[1], ncol = 11, dimnames = list(lPs$Name, colnames(lPs)[4:14])))
+# Calculate difference from total
+for (i in 4:14){
+  df[,i-3] <- log2(lPs[,i]) - log2(lPs$Total)
+}
+
+# Remove chemicals with very high uncertainty (due to high complexity metabolism or metabolites with most
+# measurements below the LOD)
+bigdiff <- unlist(apply(df, 1, function(x) (sum(x > 0, na.rm = TRUE) > 9)))  # 4 chemicals same sign for all pops
+# Add to this those chemicals that are clearly troublesome
+badChems <- c(77, 138, 23, 87, 88, 2, 169, 149, 165)
+bigdiff[badChems] <- TRUE
+df <- df[!bigdiff,]
+tmp <- tmp[!bigdiff]
+lPs <- lPs[!bigdiff,]
+
+# Remove total population group b/c it adds no info to the plot
+df$Total <- NULL
+lPs$Total <- NULL
+
+# Get cluster order for rows and columns
+cluster <- "Class"  # Group by chemical class rather than numerical clustering
+df2 <- df
+# Replace missing data with median across all chemicals to allow for clustering
+for (i in 1:dim(df2)[2]){
+  df2[is.na(df2[,i]),i] <- median(as.numeric(df2[,i]), na.rm = TRUE)
+}
+# For rows 
+if (cluster == "Class"){
+  df <- df[order(tmp),]
+} else if (cluster == "Ests"){
+  dists <- dist(df2)
+  dists <- hclust(dists, method = "complete") # contains the ordering of the rows
+  df <- df[dists$order,]
+}
+# For columns
+dists <- dist(t(df2))
+dists <- hclust(dists, method = "complete") # contains the ordering of the columns
+df <- df[,dists$order]
+```
+
+## Prepare plot aspects
+```{r prepPlot}
+row.anno <- data.frame("ChemicalClass" = tmp, row.names = lPs$Name)
+cols <- primary.colors(length(unique(row.anno$ChemicalClass)))
+anno.cols <- cols[1:length(unique(row.anno$ChemicalClass))]
+names(anno.cols) <- levels(row.anno$ChemicalClass)
+anno.cols <- list(ChemicalClass = anno.cols)
+
+# To get value of 0 to be white (i.e. scale color palette)
+paletteLength <- 50
+myColor <- colorRampPalette(c("blue", "white", "red"))(paletteLength)
+myBreaks <- c(seq(min(df, na.rm = TRUE), 0, length.out = ceiling(paletteLength/2) + 1),
+              seq(max(df, na.rm = TRUE)/paletteLength, max(df, na.rm = TRUE), length.out = floor(paletteLength/2)))
+
+# Set up gaps by class: anno.cols is in the correct order, so step through this and keep a running
+# count of how many is in each class to set up a gaps vector
+gaps <- numeric(length(anno.cols$ChemicalClass) - 1)
+k <- 0
+for (i in 1:(length(anno.cols$ChemicalClass)-1)){
+  temp <- sum(row.anno$ChemicalClass == names(anno.cols$ChemicalClass)[i])
+  gaps[i] <- k + temp
+  k <- k + temp 
+}
+```
+
+## Make the plot
+```{r plot}
+p <- pheatmap(df, color = myColor, breaks = myBreaks, border_color = "gray",
+          cluster_cols = TRUE, cluster_rows = FALSE, annotation_row = row.anno,
+          main = "Difference in Estimated Exposure Across Population Groups", fontsize = 12,
+          fontsize_row = 12, annotation_colors = anno.cols, annotation_names_col = FALSE,
+          show_rownames = TRUE, annotation_names_row = FALSE, na_col = "grey",
+          annotation_legend = TRUE, show_colnames = TRUE, fontsize_col = 15, gaps_row = gaps)
+p <- p + grid.text("Log2(Group-Total)", x = 0.68, y = 0.964)
+
+pdf(file = paste("log2ExpEstvsTotalHeatmap_all_vert_red_legend_", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = ""),
+    width = 12.5, height = 25)
+  print(p)
+dev.off()
+
+```
+
+
+## Save supplemental data file for this plot
+```{r saveData}
+ind <- match(row.names(df), row.names(row.anno))
+df$ChemicalClass <- row.anno$ChemicalClass[ind]
+df$Name <- row.names(df)
+ind <- match(df$Name, lPs$Name)
+df$CAS <- lPs$CAS[ind]
+df$DTXSID <- lPs$DTXSID[ind]
+df <- df[,c(14,13,12,11,5,1,2,9,10,7,3,8,4,6)]
+df[,5:14] <- round(df[,5:14], digits = 4)
+write.table(df, file = "bayesmarkerPaper_Fig4_data.txt", sep = "\t", row.names = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

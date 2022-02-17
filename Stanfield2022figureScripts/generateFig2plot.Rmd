@@ -1,0 +1,100 @@
+---
+title: "Visualize Metabolite Map:  Figure 2"
+author: "Zachary Stanfield"
+date: "January 4, 2022"
+output: html_document
+---
+
+from "Bayesian Inference of Chemical Exposures from NHANES Urine Biomonitoring Data"
+
+Zachary Stanfield, R. Woodrow Setzer, Victoria Hull, Risa R. Sayre, Kristin K. Isaacs, John F. Wambaugh
+
+(Insert Journal Name, issue, data, and page numbers)
+
+(Insert link to DOI)
+
+## Prepare for session
+### Load relevant libraries
+```{r setup}
+library(tidyverse)
+library(igraph)
+library(gdata)
+library(RColorBrewer)
+```
+
+### Load the data
+```{r mapData}
+map <- read.xls("NHANEScodes_ZS_2020-12-15.xlsx", as.is = TRUE, sheet = 3)
+```
+
+## Prepare the network
+
+Want to create an edge list with columns:  parent (source) and metabolite (destination) 
+with corresponding data frame with node type information
+
+### Edge list
+```{r edgeList}
+data <- map[,colnames(map) %in% c("Name", "Name.1")]
+colnames(data) <- c("source", "destination")
+sources <- data %>%
+  distinct(source) %>%
+  rename(label = source)
+sources$type = rep("Parent chemical", dim(sources)[1])
+destinations <- data %>%
+  distinct(destination) %>%
+  rename(label = destination)
+destinations$type = rep("Chemical measured in urine", dim(destinations)[1])
+```
+
+### Nodes table
+We have 3 node types:  1. exclusively parent, 2. exclusively metabolite, and 3. chemical directly measured
+in urine (could have both parents and metabolites).
+```{r nodes}
+nodes <- full_join(sources, destinations, by = "label")
+indP <- unlist(apply(nodes, 1, function(x) x[2] == "Parent chemical"))
+indM <- unlist(apply(nodes, 1, function(x) x[3] == "Chemical measured in urine"))
+indB <- indP & indM
+parents <- which(indP & is.na(indM))
+metabs <- which(indM & is.na(indP))
+both <- which(!is.na(indB))
+nodes$type = NA
+nodes$type[parents] <- "Parent chemical"
+nodes$type[metabs] <- "Chemical measured in urine"
+nodes$type[both] <- "Directly measured"
+nodes <- nodes %>% rowid_to_column("id")
+nodes <- nodes[,c(1,2,5)]
+```
+
+## Make final edge list
+Add all the information together to a data frame that will be used for plotting
+```{r edges}
+per_route <- data %>%
+  group_by(source, destination) %>%
+  summarise(weight = n()) %>%
+  ungroup()
+edges <- per_route %>%
+  left_join(nodes, by = c("source" = "label")) %>%
+  rename(from = id)
+edges <- edges %>%
+  left_join(nodes, by = c("destination" = "label")) %>%
+  rename(to = id)
+edges <- select(edges, from, to, weight)
+# Remove self loops
+ind <- edges$from == edges$to
+edges <- edges[!ind,]
+# Final graph
+g <- graph_from_data_frame(d = edges, vertices = nodes, directed = TRUE)
+coul <- rev(brewer.pal(3, "Set1"))
+my_color <- coul[as.numeric(as.factor(V(g)$type))]
+```
+
+## Make the plot
+```{r Fig2}
+#pdf(file = "Figure2.pdf", width = 10, height = 10)
+plot(g, vertex.color = my_color, layout = layout_with_kk, edge.arrow.size = 0.3,
+      vertex.label.cex = 0.5, vertex.label.dist = 0.25, vertex.size = 1.5, vertex.label.color = "black") #, vertex.label = NA
+#dev.off()
+
+```
+
+

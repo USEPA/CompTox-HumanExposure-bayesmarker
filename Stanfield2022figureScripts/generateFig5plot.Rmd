@@ -1,0 +1,306 @@
+---
+title: "Calculate Bioactivity:Exposure Ratios for Parent Chemicals of NHANES metabolites:  Fig. 5"
+author: "Zachary Stanfield"
+date: "January 6, 2022"
+output: html_document
+---
+
+from "Bayesian Inference of Chemical Exposures from NHANES Urine Biomonitoring Data"
+
+Zachary Stanfield, R. Woodrow Setzer, Victoria Hull, Risa R. Sayre, Kristin K. Isaacs, John F. Wambaugh
+
+(Insert Journal Name, issue, data, and page numbers)
+
+(Insert link to DOI)
+
+# Description
+This file uses the inferred exposures for parent chemicals of NHANES biomarkers that was obtained using
+the bayesmarker package along with the R package HTTK and estimated rat LD50 values (via OPERA) to 
+obtain bioactivity exposure rations (BERs), which is a measure of risk.
+
+## Prepare for session
+### Load relevant libraries
+```{r setup}
+library(httk)
+library(gdata)
+library(ggplot2)
+library(reshape2)
+library(colorRamps)
+```
+
+### Declare some needed data objects
+```{r dataObjs}
+# Reference for population groups
+subpops <- c("Total", "Male", "Female", "0 - 5", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
+             "ReproAgeFemale", "BMI <= 30", "BMI > 30")
+names(subpops) <- c("Total", "Male", "Female", "0 - 5", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
+                    "ReproAgeFemale", "BMI_le_30", "BMI_gt_30")
+# Cohorts
+phases <- c("99-00", "01-02", "03-04", "05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
+path_to_lPs <- "testingAllPhases"
+map <- read.xls("NHANEScodes_ZS_2020-12-15.xlsx", as.is = TRUE, sheet = 3)
+```
+
+## Obtain desired data from saved output of bayesmarker runs  
+Select the most recent cohort for each parent chemical from the full set of individual cohort runs.
+If this data is not already available, users can alter their input file to include just the latest
+cohort row for each individual biomarker before working through the bayesmarker pipeline (see the 
+vignette calculateExposureInferences for the pipeline).  
+
+```{r readLPs}
+dta.1 <- list()
+dta.2 <- list()
+for (j in 1:length(phases)){
+  
+  # Obtain file names for lPsamps
+  if (is.null(path_to)){
+    files <- list.files(path = ".", pattern = "lPsamps-gm_kg_day")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  } else {
+    path <- file.path(".", path_to, phases[j])
+    files <- paste(path, "/", list.files(path = path, pattern = "lPsamps-gm_kg_day"), sep = "")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  }
+  
+  # Load each subpop file, get 95% CI, convert units, and save
+  for (i in 1:length(subpops)){
+    if (length(grep(paste("_", subpops[i], sep = ""), files)) == 0){
+      # For cases like "0 - 5" supbop not in other phases.
+      # Ok to call dta.1 here b/c 0-5 is not 1st in subpops
+      dta <- NA
+    } else {
+      load(files[grep(paste("_", subpops[i], sep = ""), files)])
+      samps <- exp(as.matrix(lPsampsgm))
+      dta <- as.data.frame(samps)
+    }
+    dta.1[[i]] <- dta
+    names(dta.1)[i] <- subpops[i]
+  }
+  dta.2[[j]] <- dta.1
+  names(dta.2)[j] <- phases[j]
+}
+
+# Get the most recent estimate for each chemical. Read in previous most-recent result for easier filtering
+load("ParentExpEsts_MostRecent_withCIquant_2021-09-24.RData")
+chems <- final[,3]
+ExpByChem <- list() 
+for (i in 1:length(chems)){
+  cohort <- final[final[,3] == chems[i],37] 
+  for (j in 1:length(subpops)){
+    if (j == 1){
+      ExpByChem[[i]] <- dta.2[[cohort]][[subpops[j]]][,chems[i]]
+    } else {
+      if (is.null(dim(dta.2[[cohort]][[subpops[j]]]))){  # No data for this population in this cohort
+        ExpByChem[[i]] <- cbind(ExpByChem[[i]], as.data.frame(matrix(data = NA, nrow = 1000, ncol = 1)))
+      } else {
+        if (!chems[i] %in% colnames(dta.2[[cohort]][[subpops[j]]])){  # Chemical not measured for this population in this cohort
+          ExpByChem[[i]] <- cbind(ExpByChem[[i]], as.data.frame(matrix(data = NA, nrow = 1000, ncol = 1)))
+        } else {
+          ExpByChem[[i]] <- cbind(ExpByChem[[i]], dta.2[[cohort]][[subpops[j]]][,chems[i]])
+        }
+      }
+    }
+  }
+  ExpByChem[[i]] <- as.data.frame(ExpByChem[[i]])
+  colnames(ExpByChem[[i]]) <- subpops
+}
+names(ExpByChem) <- chems
+
+```
+
+
+## Obtain LD50 values
+If this is first runthrough of this file, need to save chemical identifiers and run
+through the OPERA software to obtain LD50 values using CATMoS
+
+```{r forOPERA}
+# Unique chemical identifiers to obtain CATMoS predictions
+ind <- match(names(ExpByChem), map$CAS)
+chemDTXSIDs <- unique(map$DTXSID[ind])
+write.table(chemDTXSIDs, file = "parentChemDTXSIDs.txt", col.names = FALSE, row.names = FALSE, quote = FALSE)
+# Run these chemicals through OPERA
+
+# Load those results (CATMoS data)
+testpreds <- read.xls("parentChemDTXSIDS_OPERAout_CATMoS.xlsx")
+testpreds <- testpreds[!is.na(testpreds$CATMoS_VT_pred), 1:12]
+
+# Apply uncertainty factor (Venman and Flaga 1985)
+testpreds$CATMoS_LD50_pred <- 0.0001 * testpreds$CATMoS_LD50_pred
+```
+
+## Use HTTK to calculate the human equivalent dose based on the rat LD50
+```{r calcHED}
+# For which chemicals does hhtk have all the information we need?
+z <- subset(get_cheminfo(info = "all", species = "Human", model = "pbtk"), DTXSID %in% testpreds$MoleculeID)
+
+# Use the calc_tkstats function to get mean concentration from CATMoS value.
+# Already in correct units of mg/kg
+tmp_risk <- testpreds[testpreds$MoleculeID %in% z$DTXSID,]
+ind <- match(tmp_risk$MoleculeID, map$DTXSID)
+tmp_risk$CASRN <- map$CAS[ind]
+redmap <- map[match(tmp_risk$CASRN, map$CAS), c("Name", "CAS", "DTXSID", "MW")]
+risk <- c()
+for (i in 1:dim(tmp_risk)[1]){
+  dose_value <- tmp_risk$CATMoS_LD50_pred[i]
+  risk[i] <- calc_tkstats(chem.cas = tmp_risk$CASRN[i], route = "oral", species = "Human", days = 1, daily.dose = 1, 
+                          dose = dose_value, doses.per.day = 1, output.units = "mg/L", concentration = "plasma", stats = "mean",
+                          tissue = "plasma", model = "pbtk", default.to.human = TRUE)
+  
+}
+names(risk) <- tmp_risk$CASRN
+```
+
+
+## Use the HTTK calc_mc_css function to get steady state concentration (is 1 mg/kg/day) from our inferred
+## exposure values
+
+```{r calcExp}
+y <- subset(get_cheminfo(info = "all", species = "Human", model = "pbtk"), DTXSID %in% testpreds$MoleculeID)
+
+# Need to get risk for each subpopulation
+tmp_exp_risk <- testpreds[testpreds$MoleculeID %in% y$DTXSID,]
+
+ind <- match(tmp_exp_risk$MoleculeID, map$DTXSID)
+tmp_exp_risk$CASRN <- map$CAS[ind]
+
+# Step through all chemicals to get the css value
+ssconc <- c()
+exp_risk <- list()
+for (i in 1:dim(tmp_exp_risk)[1]){
+  ind <- which(names(ExpByChem) == tmp_exp_risk$CASRN[i])
+  tmp <- ExpByChem[[ind]]
+  out <- calc_mc_css(chem.cas = tmp_exp_risk$CASRN[i], samples = 1000, which.quantile = 0.50, species = "Human",
+                          model = "pbtk", output.units = "mg/L")  
+  ssconc <- c(ssconc, out)
+  exp_risk[[i]] <- out * tmp
+}
+names(exp_risk) <- tmp_exp_risk$CASRN
+```
+
+
+## Obtain the BERs using the transformed exposure values and human equivalent dose
+```{r calcBER}
+ratio <- list()
+for (i in 1:length(exp_risk)){
+  ratio[[i]] <- risk[i]/exp_risk[[i]]  
+}
+names(ratio) <- names(exp_risk)
+```
+
+
+## Set up DF and plot: step through all chemicals and all subpops for each chemical
+```{r plotSetUp}
+# Get CIs for Total and just median for others
+df <- as.data.frame(matrix(data = NA, nrow = length(ratio), ncol = length(subpops) + 2, 
+                           dimnames = list(names(ratio), c(subpops, "lowCI", "upCI"))))
+for (i in 1:length(ratio)){
+  for (j in 1:length(ratio[[i]])){
+    if (j == 1){
+      tmp <- quantile(ratio[[i]][,j], probs = c(0.5, 0.025, 0.975), na.rm = TRUE)
+      df[i,subpops[j]] <- tmp[1] 
+      df[i, c("lowCI", "upCI")] <- tmp[2:3]
+    } else {
+    df[i,subpops[j]] <- quantile(ratio[[i]][,j], probs = 0.5, na.rm = TRUE)
+    }
+  }
+}
+
+# Add preferred name and DTXSID
+indP <- match(row.names(df), map$CAS)
+df$Chemical <- map$Name[indP]
+df$DTXSID <- map$DTXSID[indP]
+
+# Romove DNOP as it is a major outlier 
+df <- df[!df$Chemical == "Di-n-octyl phthalate",]
+# And Ethylbenzene has too many values below the LOD
+df <- df[!df$Chemical == "Ethylbenzene",]
+
+# Add chemical class
+map <- map[map$CAS %in% row.names(df),]
+map <- map[,c(2,3,4,7,8,9)]
+map$CAS.1 <- gsub(" ", "", map$CAS.1)
+classTable <- read.xls("allPhasesAllChems_ChemClass.xlsx", sheet = 1)
+map$ChemClass <- apply(map, 1, function(x) classTable$Column4[match(x[5], classTable$Column1)])
+
+# Shorten the class names for a more concise plot
+map$ChemClass <- as.character(map$ChemClass)
+map$ChemClass[map$ChemClass == "Carbamate Pesticide Metabolites"] <- "Carbamate Pesticides"
+map$ChemClass[map$ChemClass == "Flame Retardant Metabolite"] <- "Flame Retardant"
+map$ChemClass[map$ChemClass == "Fungicides and Metabolites"] <- "Fungicides"
+map$ChemClass[map$ChemClass == "Herbicides and Metabolites"] <- "Herbicides"
+map$ChemClass[map$ChemClass == "Insect Repellent and Metabolites"] <- "Insect Repellent"
+map$ChemClass[map$ChemClass == "Organochlorine Pesticide Metabolites"] <- "Organochlorine Pesticides"
+map$ChemClass[map$ChemClass == "Personal Care and Consumer Product Chemicals"] <- "Personal Care/Consumer Product"
+map$ChemClass[map$ChemClass == "Phthalate and Phthalate Alternative Metabolites"] <- "Phthalates"
+map$ChemClass[map$ChemClass == "Phytoestrogens and Metabolites"] <- "Phytoestrogens"
+map$ChemClass[map$ChemClass == "Polycyclic Aromatic Hydrocarbon Metabolites"] <- "Polycyclic Aromatic Hydrocarbons"
+map$ChemClass[map$ChemClass == "Pyrethroid Metabolites"] <- "Pyrethroids"
+map$ChemClass[map$ChemClass == "Volatile Organic Compound Metabolites"] <- "Volatile Organic Compounds"
+
+# Fix up factor levels
+tmp <- as.character(map$ChemClass[match(row.names(df), map$CAS)])
+tmp[is.na(tmp)] <- "Unknown"
+df$ChemicalClass <- tmp
+df$Chemical <- factor(df$Chemical, levels = as.character(df$Chemical))
+df$ChemicalClass <- factor(df$ChemicalClass, levels = sort(unique(df$ChemicalClass)))
+df <- melt(df, id.vars = c("Chemical", "ChemicalClass", "upCI", "lowCI"))
+colnames(df) <- c("Chemical", "ChemicalClass", "upCI", "lowCI", "Group", "BER")
+
+# Clean up
+df <- df[!df$Group == "DTXSID",]
+df$BER <- as.numeric(df$BER)
+
+# Sort by lowest BER
+ind <- order(df$BER[df$Group == "Total"], decreasing = FALSE)
+df$Chemical <- ordered(df$Chemical, levels = levels(df$Chemical)[ind])
+```
+
+## Make final plot
+```{r BERplot}
+pdf(file = paste("BERplotForParents_subpops_withCIs_0.0001UF_primaryCols_", 
+                 format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = ""), width = 17.5, height = 9.5)
+ggplot(df, aes(x = Chemical, y = BER, color = ChemicalClass, group = Group, shape = Group)) + 
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = lowCI, ymax = upCI), width = 0.2, alpha = 0.8) +
+  scale_y_log10(limits = c(1, 1e+12)) +
+  ylab("BER") +
+  ggtitle("Bioactivity:Exposure Ratio (BER) for Parent Chemicals of NHANES Metabolites") +
+  theme_set(theme_gray(base_size = 17)) +
+  theme(axis.text.x=element_text(angle=50, hjust=1, size = 13)) +
+  theme(axis.title.x = element_blank()) +
+  scale_color_manual(values = primary.colors(n = 1 + length(levels(df$ChemicalClass)))) +
+  #scale_color_manual(values = rainbow(n = length(levels(df$ChemicalClass)))) +
+  scale_shape_manual(name = "Group", 
+                     labels = c("Total", "Males", "Females", "Age.0.5", "Age.6.11", "Age.12.19", "Age.20.65", 
+                                "Age.GT65", "ReproAgeFemale", "BMI <= 30", "BMI > 30"),
+                     values = c(0,1,2,3,4,5,8,11,15,16,18)) 
+dev.off()
+```
+
+# Save supplemental data file
+```{r suppData}
+ind <- match(df$Chemical, map$Name)
+df_out <- cbind("DTXSID" = map$DTXSID[ind], "CAS" = map$CAS[ind], df)
+df_out <- df_out[,c(1:4,7,8,6,5)]
+write.table(df_out, file = "bayesmarkerPaper_Fig5_data.txt", sep = "\t", row.names = FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

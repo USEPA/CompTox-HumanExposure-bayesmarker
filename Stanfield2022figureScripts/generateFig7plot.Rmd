@@ -1,0 +1,365 @@
+---
+title: "Compare SEEM Predictions to Bayesmarker Inferences (Fig. 7)"
+author: "Zachary Stanfield"
+date: "January 11, 2022"
+output: html_document
+---
+
+from "Bayesian Inference of Chemical Exposures from NHANES Urine Biomonitoring Data"
+
+Zachary Stanfield, R. Woodrow Setzer, Victoria Hull, Risa R. Sayre, Kristin K. Isaacs, John F. Wambaugh
+
+(Insert Journal Name, issue, data, and page numbers)
+
+(Insert link to DOI)
+
+# Description
+This file compares the infered exposure estimates obtained from bayesmarker with the SEEM predictions of exposure
+for "new" chemicals (those chemicals not in the SEEM calibration set) for the 4 cohorts since the first iteration
+of SEEM (2009-2010, 2011-2012, 2013-2014, and 2015-2016).
+
+## Prepare for session
+### Load relevant libraries
+```{r setup}
+library(gdata)
+library(ggplot2)
+```
+
+### Declare some needed data objects
+```{r dataObjs}
+# Read SEEM3 predictions
+load("chem.preds-2018-11-28.RData")
+colnames(chem.preds)
+
+# Load old estimates to drop chemicals that were in the original training data
+oldEsts <- read.xls("Wambaugh_et_al_2014_urine.xlsx", pattern = "Compound")
+
+# Reference for population groups
+subpops <- c("Total", "Male", "Female", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
+             "ReproAgeFemale", "BMI <= 30", "BMI > 30")
+names(subpops) <- c("Total", "Male", "Female", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
+                    "ReproAgeFemale", "BMI_le_30", "BMI_gt_30")
+
+# Subpops the user wants plotted
+SUBPOP <- "Total"
+if (SUBPOP != "all"){
+  ind <- SUBPOP %in% subpops
+  subpops <- subpops[ind]
+}
+
+phases <- c("09-10", "11-12", "13-14", "15-16")
+
+path_to_lPs <- "testingAllPhases"
+```
+
+## Obtain the bayesmarker infered exposures for the relevant population and cohorts
+If this data has not yet been calculated, users can run the main vignette for the 4 above cohots and the total
+population for either all chemicals or the non-calibration set of chemicals (compare the set of chemicals of 
+each cohort with the ones in oldEsts and chem.preds to just get inferences for the desired chemicals)
+```{r getData}
+dta.2 <- c()
+dta.2.low <- c()
+dta.2.up <- c()
+for (j in 1:length(phases)){
+  
+  # Obtain file names for lPsamps
+  if (is.null(path_to_lPs)){
+    files <- list.files(path = ".", pattern = "lPsamps-gm_kg_day")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  } else {
+    path <- file.path(".", path_to_lPs, phases[j])
+    files <- paste(path, "/", list.files(path = path, pattern = "lPsamps-gm_kg_day"), sep = "")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  }
+  
+  # Read in files and build data.frame
+  load(files[grep(paste("_", subpops, sep = ""), files)])
+  samps <- as.matrix(lPsampsgm)
+  
+  # Having all NAs for a column causes an error
+  rmind <- unlist(apply(samps, 2, function(x) sum(is.na(x)) == length(x)))
+  samps <- samps[,!rmind]
+  result.med <- apply(samps, 2, mean)
+  result.bar <- mean(apply(samps, 1, mean))
+  
+  # Get 95th Percentiles
+  result.CI <- t(apply(samps, 2, function(x) quantile(x, probs = c(0.0275, 0.975))))
+  dta <- data.frame(colnames(samps), exp(result.med))
+  dta.low <- data.frame(colnames(samps), exp(result.CI[,1]))
+  dta.up <- data.frame(colnames(samps), exp(result.CI[,2]))
+  colnames(dta) <- c("CAS", subpops)
+  colnames(dta.low) <- c("CAS", paste(subpops, "_low95", sep = ""))
+  colnames(dta.up) <- c("CAS", paste(subpops, "_up95", sep = ""))
+
+  dta.2 <- rbind(cbind(dta, "Phase" = rep(phases[j], dim(dta)[1])), dta.2)
+  dta.2.low <- rbind(cbind(dta.low, "Phase" = rep(phases[j], dim(dta.low)[1])), dta.2.low)
+  dta.2.up <- rbind(cbind(dta.up, "Phase" = rep(phases[j], dim(dta.up)[1])), dta.2.up)
+}
+```
+
+## Remove rows with the chemicals that were in the calibration data
+```{r remCalib}
+dta.2 <- dta.2[!dta.2$CAS %in% oldEsts$CASRN,]
+dta.2.low <- dta.2.low[!dta.2.low$CAS %in% oldEsts$CASRN,]
+dta.2.up <- dta.2.up[!dta.2.up$CAS %in% oldEsts$CASRN,]
+```
+
+## Reduce SEEM and our data frames to this set of chemicals
+```{r redChems}
+shared <- (intersect(unique(dta.2$CAS), chem.preds$CAS)) 
+SEEM <- chem.preds[chem.preds$CAS %in% shared, c("dsstox_substance_id", "CAS", "Substance_Name", "seem3", "seem3.l95", "seem3.u95")]
+dta.2 <- dta.2[dta.2$CAS %in% shared,]
+dta.2.low <- dta.2.low[dta.2.low$CAS %in% shared,]
+dta.2.up <- dta.2.up[dta.2.up$CAS %in% shared,]
+```
+
+## Add chemical class to see if we predict better for some classes than others
+```{r addClass}
+map <- read.xls("NHANEScodes_ZS_2020-12-15.xlsx", as.is = TRUE, sheet = 3)
+map <- map[,c(2,3,4,7,8,9)]
+classTable <- read.xls("allPhasesAllChems_ChemClass.xlsx", sheet = 1)
+map$CAS.1 <- gsub(" ", "", map$CAS.1)
+map$ChemClass <- apply(map, 1, function(x) classTable$Column4[match(x[5], classTable$Column1)])
+
+# Shorten the class names for concise plotting
+map$ChemClass <- as.character(map$ChemClass)
+map$ChemClass[map$ChemClass == "Carbamate Pesticide Metabolites"] <- "Carbamate Pesticides"
+map$ChemClass[map$ChemClass == "Flame Retardant Metabolite"] <- "Flame Retardant"
+map$ChemClass[map$ChemClass == "Fungicides and Metabolites"] <- "Fungicides"
+map$ChemClass[map$ChemClass == "Herbicides and Metabolites"] <- "Herbicides"
+map$ChemClass[map$ChemClass == "Insect Repellent and Metabolites"] <- "Insect Repellent"
+map$ChemClass[map$ChemClass == "Organochlorine Pesticide Metabolites"] <- "Organochlorine Pesticides"
+map$ChemClass[map$ChemClass == "Personal Care and Consumer Product Chemicals"] <- "Personal Care/Consumer Product"
+map$ChemClass[map$ChemClass == "Phthalate and Phthalate Alternative Metabolites"] <- "Phthalates"
+map$ChemClass[map$ChemClass == "Phytoestrogens and Metabolites"] <- "Phytoestrogens"
+map$ChemClass[map$ChemClass == "Polycyclic Aromatic Hydrocarbon Metabolites"] <- "Polycyclic Aromatic Hydrocarbons"
+map$ChemClass[map$ChemClass == "Pyrethroid Metabolites"] <- "Pyrethroids"
+map$ChemClass[map$ChemClass == "Volatile Organic Compound Metabolites"] <- "Volatile Organic Compounds"
+```
+
+
+## Make a facet plot by cohort 
+```{r makePlot}
+indclass <- match(dta.2$CAS, map$CAS)
+ind <- match(dta.2$CAS, SEEM$CAS)
+
+df <- data.frame(y = dta.2$Total, x = SEEM$seem3[ind], ylower = dta.2.low$Total_low95, yupper = dta.2.up$Total_up95,
+                 xlower = SEEM$seem3.l95[ind], xupper = SEEM$seem3.u95[ind], ChemicalClass = map$ChemClass[indclass],
+                 "NHANES.cohort" = dta.2$Phase)
+df$NHANES.cohort <- factor(df$NHANES.cohort, levels = phases)
+
+pdf(file = "Comparison_NewInferencesVsSEEM_facet_2021-07-09.pdf", width = 18.5, height = 16)
+ggplot(data = df, aes(x = x, y = y, ymin = ylower, ymax = yupper, xmin = xlower, xmax = xupper, color = ChemicalClass, group = NHANES.cohort)) +
+  geom_point(size = 1.75) +
+  geom_errorbar(width = 0) +
+  geom_errorbarh(width = 0) +
+  geom_abline(xintercept=0, yintercept=1, lty=3, color="darkgray") +
+  scale_y_log10() +
+  scale_x_log10() +
+  facet_wrap(~NHANES.cohort, nrow = 2) +
+  theme_set(theme_gray(base_size = 23)) +
+  theme(legend.position = "bottom") +
+  ylab("Updated NHANES Inferences") +
+  xlab("SEEM Predictions") +
+  coord_flip() + 
+  ggtitle("Comparison of Exposure Intake Rates for bayesmarker and SEEM")
+dev.off()
+```
+
+## Save data for supplemental table
+```{r saveData}
+ind2 <- match(dta.2$CAS, map$CAS)
+df <- data.frame("Cohort" = dta.2$Phase, "DTXSID" = map$DTXSID[ind2], "CAS" = map$CAS[ind2], "Name" = map$Name[ind2], 
+                 "ChemicalClass" = map$ChemClass[indclass], "Bayesmarker_median" = dta.2$Total, 
+                 "Bayesmarker_low95CI" = dta.2.low$Total_low95, "Bayesmarker_up95CI" = dta.2.up$Total_up95,
+                 "SEEM_median" = SEEM$seem3[ind], "SEEM_low95CI" = SEEM$seem3.l95[ind], "SEEM_up95CI" = SEEM$seem3.u95[ind])
+df <- df[dim(df)[1]:1,]
+write.table(df, file = "bayesmarkerPaper_Fig7_data.txt", sep = "\t", row.names = FALSE)
+```
+
+
+
+# Generating the R^2 supplemental table 
+We take some similar steps during setup but generate r^2 values by cohort and by chemical class to better
+understand how the predictions match up.  Uses the same data objects declared in the previous section.
+
+## Obtain the bayesmarker infered exposures for the relevant population and cohorts
+If this data has not yet been calculated, users can run the main vignette for the 4 above cohots and the total
+population for either all chemicals or the non-calibration set of chemicals (compare the set of chemicals of 
+each cohort with the ones in oldEsts and chem.preds to just get inferences for the desired chemicals)
+```{r collectInfExps}
+dta.2 <- list()
+for (j in 1:length(phases)){
+  
+  # Obtain file names for lPsamps
+  path <- file.path(".", path_to, phases[j])
+  files <- paste(path, "/", list.files(path = path, pattern = "lPsamps-gm_kg_day"), sep = "")
+  dates <- "2021-05-11"
+  files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  
+  # Load the Total file
+  load(files[grep(paste("_", subpops, sep = ""), files)])
+  samps <- exp(as.matrix(lPsampsgm))
+  dta <- as.data.frame(samps)
+  
+  # Record data for this phase
+  dta.2[[j]] <- dta
+  names(dta.2)[j] <- phases[j]
+}
+# dta.2 is a list with 1 element for each of the 4 phases.  Each phase only
+# has 1 table, which is the lP matrix for the total population
+```
+
+## Remove rows with the chemicals that were in the calibration data
+```{r remCalib}
+dta.2 <- lapply(dta.2, function(x) x[,!colnames(x) %in% as.character(oldEsts$CASRN)])
+```
+
+## Reduce SEEM and our data frames to this set of chemicals
+```{r redChems}
+shared <- intersect(unique(unlist(sapply(dta.2, function(x) colnames(x)))), chem.preds$CAS) 
+ind <- match(shared, chem.preds$CAS)
+SEEM <- chem.preds[ind, c("dsstox_substance_id", "CAS", "Substance_Name", "seem3", "seem3.l95", "seem3.u95")]
+dta.2 <- lapply(dta.2, function(x) x[,colnames(x) %in% shared])
+```
+
+## Add chemical class to see if we predict better for some classes than others
+```{r addClass}
+map <- read.xls("NHANEScodes_ZS_2020-12-15.xlsx", as.is = TRUE, sheet = 3)
+map <- map[,c(2,3,4,7,8,9)]
+classTable <- read.xls("allPhasesAllChems_ChemClass.xlsx", sheet = 1)
+map$CAS.1 <- gsub(" ", "", map$CAS.1)
+map$ChemClass <- apply(map, 1, function(x) classTable$Column4[match(x[5], classTable$Column1)])
+
+# Shorten the class names for concise plotting
+map$ChemClass <- as.character(map$ChemClass)
+map$ChemClass[map$ChemClass == "Carbamate Pesticide Metabolites"] <- "Carbamate Pesticides"
+map$ChemClass[map$ChemClass == "Flame Retardant Metabolite"] <- "Flame Retardant"
+map$ChemClass[map$ChemClass == "Fungicides and Metabolites"] <- "Fungicides"
+map$ChemClass[map$ChemClass == "Herbicides and Metabolites"] <- "Herbicides"
+map$ChemClass[map$ChemClass == "Insect Repellent and Metabolites"] <- "Insect Repellent"
+map$ChemClass[map$ChemClass == "Organochlorine Pesticide Metabolites"] <- "Organochlorine Pesticides"
+map$ChemClass[map$ChemClass == "Personal Care and Consumer Product Chemicals"] <- "Personal Care/Consumer Product"
+map$ChemClass[map$ChemClass == "Phthalate and Phthalate Alternative Metabolites"] <- "Phthalates"
+map$ChemClass[map$ChemClass == "Phytoestrogens and Metabolites"] <- "Phytoestrogens"
+map$ChemClass[map$ChemClass == "Polycyclic Aromatic Hydrocarbon Metabolites"] <- "Polycyclic Aromatic Hydrocarbons"
+map$ChemClass[map$ChemClass == "Pyrethroid Metabolites"] <- "Pyrethroids"
+map$ChemClass[map$ChemClass == "Volatile Organic Compound Metabolites"] <- "Volatile Organic Compounds"
+```
+
+## Keep a reference file for the chemical class for each cohort to help in plotting
+```{r classRef}
+class_ref <- list()
+for (i in 1:length(dta.2)){
+  phase_chems <- colnames(dta.2[[i]])
+  indclass <- match(phase_chems, map$CAS)
+  class_ref[[i]] <- data.frame("Chemical" = phase_chems, "Name" = map$Name[indclass], "ChemicalClass" = map$ChemClass[indclass])
+  class_ref[[i]]$ChemicalClass <- factor(class_ref[[i]]$ChemicalClass, levels = c(levels(class_ref[[i]]$ChemicalClass), "Unknown"))
+  class_ref[[i]]$ChemicalClass[is.na(class_ref[[i]]$ChemicalClass)] <- "Unknown"
+}
+names(class_ref) <- names(dta.2)
+```
+
+## Log transform the data
+```{r log}
+SEEM[,4:6] <- log(SEEM[,4:6])
+dta.2 <- lapply(dta.2, log)
+```
+
+## Calculate R^2 values by cohort and chemical class
+Also includes the option to plot these inividual data points within all cohort-class pairings
+with 95% CIs, a correlation value, and associate p-value.
+```{r genRsqData}
+iter <- 1000
+rsquar_class <- list()
+rmse_class <- list()
+rsquar <- as.data.frame(matrix(data = NA, nrow = iter, ncol = length(phases), dimnames = list(1:iter, phases)))
+rmse <- rsquar
+doPlot <- FALSE
+if (doPlot){
+  pdf(file = "SEEM_vs_Bayesmarker_nonTrainingChems_byChemClass_invFC.pdf", width = 9, height = 8)
+}
+for (j in 1:length(phases)){
+  dfp <- dta.2[[j]]
+  # Do a class-specific calculation as well
+  class_set <- as.character(unique(class_ref[[j]]$ChemicalClass))
+  rsquar_class[[j]] <- as.data.frame(matrix(data = NA, nrow = iter, ncol = length(class_set), dimnames = list(1:iter, class_set)))
+  rmse_class[[j]] <- as.data.frame(matrix(data = NA, nrow = iter, ncol = length(class_set), dimnames = list(1:iter, class_set)))
+  for (i in 1:iter){
+    mySample <- sample.int(3000, 1000, replace = FALSE)
+    for (k in 1:length(class_set)){
+      class_chems <- as.character(class_ref[[j]]$Chemical[class_ref[[j]]$ChemicalClass == class_set[k]])
+      dfpc <- dfp[,colnames(dfp) %in% class_chems]
+      if (is.null(dim(dfpc))){
+        rsquar_class[[j]][i,k] <- NA
+        rmse_class[[j]][i,k] <- NA
+        next
+      }
+      dfpc <- dfpc[mySample,]
+      dfpc.med <- apply(dfpc, 2, function(x) quantile(x, probs = 0.5))
+      dfpc.up <- apply(dfpc, 2, function(x) quantile(x, probs = 0.975))
+      dfpc.low <- apply(dfpc, 2, function(x) quantile(x, probs = 0.0275))
+      sd <- (dfpc.up - dfpc.low)
+      indSEEM <- match(class_chems, SEEM$CAS)
+      finalDF <- data.frame("Chemical" = class_chems, "y" = SEEM$seem3[indSEEM], "x" = dfpc.med, 
+                            "xlower" = dfpc.low, "xupper" = dfpc.up, "ylower" = SEEM$seem3.l95[indSEEM],
+                            "yupper" = SEEM$seem3.u95[indSEEM], "SEEMrange" = (SEEM$seem3.u95[indSEEM]/SEEM$seem3.l95[indSEEM]), 
+                            "Myrange" = 1/sd^2)
+      model <- lm(y ~ x, finalDF, weights = Myrange)
+      
+      tmp <- summary(model)
+      rsquar_class[[j]][i,k] <- tmp$r.squared
+      rmse_class[[j]][i,k] <- sqrt(mean(model$residuals^2))
+      if (doPlot){
+        g <- ggplot(data = finalDF, aes(x = x, y = y, ymin = ylower, ymax = yupper, xmin = xlower, xmax = xupper)) +
+          geom_point(size = 1.75) +
+          geom_errorbar(width = 0.15, size = 0.2) +
+          geom_errorbarh(height = 0.15, size = 0.2) +
+          geom_smooth(method = "lm") +
+          geom_abline(xintercept=0, yintercept=1, lty=3, color="darkgray") +
+          scale_y_log10() +
+          scale_x_log10() +
+          theme(legend.position = "bottom") +
+          xlab("SEEM") +
+          ylab("bayesmarker") +
+          stat_cor(label.y.npc = "middle") + 
+          ggtitle(paste("Exposure predictions: bayesmarker vs SEEM (", phases[j], ", ", class_set[k], ")", sep = "")) +
+          theme(plot.title = element_text(size = 10))
+        print(g)
+      }
+    }
+    
+    tmp <- summary(model)
+    rsquar[i,j] <- tmp$r.squared
+    rmse[i,j] <- sqrt(mean(model$residuals^2))
+  }
+}
+dev.off()
+```
+
+## Create final data file of R^2 values
+```{r RsqDataFile}
+# Supplemental R^2 table: Make columns the cohorts, then 1st row is total and rest are the classes
+names(rsquar_class) <- phases
+supptables <- c()
+for (i in 1:length(phases)){
+  total <- quantile(rsquar[,phases[i]], c(0.5, 0.0275, 0.975))
+  classRes <- t(apply(rsquar_class[[i]], 2, function(x) quantile(x, probs = c(0.5, 0.0275, 0.975), na.rm = TRUE)))
+  temp <- rbind(total, classRes)  
+  supptables <- rbind(supptables, data.frame("Cohort" = rep(phases[i], dim(temp)[1]), temp))
+}
+supptables$Group <- row.names(supptables)
+supptables$Group[grep("total", supptables$Group)] <- "Total"
+colnames(supptables) <- c("Cohort", "Median", "low95CI", "up95CI", "Group")
+supptables <- supptables[,c(1,5,2,3,4)]
+supptables$Group <- gsub("[0-9 ]", "", supptables$Group)
+supptables[,3:5] <- round(supptables[,3:5], digits = 4)
+write.table(supptables, file = "bayesmarkerPaper_Fig7_Rsquar_data.txt", sep = "\t", row.names = FALSE)
+```
+
+
+
+
+
