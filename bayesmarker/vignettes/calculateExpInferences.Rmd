@@ -36,15 +36,19 @@ library(bayesmarker)
 ### Assign needed function inputs 
 The codes_file has specific formatting (see the example file included in this package or the manuscript supplemental data). 
 ```{r inputs1}
+# NHANES cohort (or phase) to get data from (e.g. "01-02", "09-10"; currently supports "99-00" and newer)
 cohort <- "15-16"
+# Path to main input file (Excel workbook with codes, weights, and map tables)
 codes_file <- "/share/home3/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx"
+# Location to save function outputs (e.g. created R data objects and plots)
 save_directory <- "/share/home3/zstanfie/MetaboliteInference/testingAllPhases"
+# Location to save the raw NHANES data (will be saved at /data_path/rawData)
 data_path <- "/share/home3/zstanfie/MetaboliteInference/testingAllPhases"
 ```
 
 ## Use the bayesmarker package 
 ### Obtain and save the raw data
-This call will result in a folder called "2015-2016" at the location "save_directory/rawData/".
+This call will result in a folder called "2015-2016" at the location "data_path/rawData/".
 The file will include all need files corresponding to the table in the codes file related to 2015-2016 metabolites.
 ```{r 1516children}
 get_NHANES_data(codes_file = codes_file, 
@@ -79,10 +83,9 @@ final <- fromMolar(SUBPOP = subpops, Measured = output$Measured, pred.data = out
 ```
 
 
-## Generate a simple plot !!! Need to update this or plot_subpops
+## Generate a simple plot 
 ```{r simplePlot}
-plot_info <- plot_subpops(path_to_lPs = paste(save_directory, "/", cohort, sep = ""), 
-                          SUBPOP = subpops, print_plot = TRUE)
+plot_info <- plot_subpops(path_to_lPs = save_directory, cohort, SUBPOP = subpops, print_plot = TRUE)
 ```
 
 
