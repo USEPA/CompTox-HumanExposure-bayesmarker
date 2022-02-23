@@ -1,0 +1,197 @@
+---
+title: "Make Heatmaps Showing Exposures Over NHANES Cohorts"
+author:  "Zachary Stanfield"
+date:  "February 11, 2022"
+output: html_document
+---
+
+from "Characterizing Exposure Trends from NHANES Urine Biomonitoring Data"
+
+Zachary Stanfield, R. Woodrow Setzer, Victoria Hull, Risa R. Sayre, Kristin K. Isaacs, John F. Wambaugh
+
+(Insert Journal Name, issue, data, and page numbers)
+
+(Insert link to DOI)
+
+# Description
+This file uses the inferred exposures for parent chemicals of NHANES biomarkers that was obtained using 
+the bayesmarker package to generate a heatmap of median exposure across all survey participants. A 
+heatmap is also generated for the metabolite "exposures".
+
+## Prepare for session 
+### Load relevant libraries
+```{r setup}
+library(readxl)
+library(RColorBrewer)
+library(colorRamps)
+library(pheatmap)
+```
+
+## Generate Parent Chemical Heatmap
+### Declare some needed objects
+```{r dataObjs}
+subpops <- "Total"
+phases <- c("99-00", "01-02", "03-04", "05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
+path_to_lPs <- "/ccte/home1/zstanfie/MetaboliteInference/testingAllPhases"
+map <- as.data.frame(read_excel("/ccte/home1/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 3))
+```
+
+
+### Obtain desired data from saved output of bayesmarker runs for generating the parent chemical heatmap
+Retrieve all cohort Markov chains for each parent chemical for the total population.
+See the vignette calculateExposureInferences.Rmd to generate the Markov chains if desired.
+```{r readlPs}
+dta.2 <- c()
+for (j in 1:length(phases)){
+
+  # Obtain file names for lPsamps
+  if (is.null(path_to_lPs)){
+    files <- list.files(path = ".", pattern = "lPsamps-gm_kg_day")
+    # If you have results from multiple runs, you can select from a specific day like this
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  } else {
+    path <- file.path(path_to_lPs, phases[j])
+    files <- paste(path, "/", list.files(path = path, pattern = "lPsamps-gm_kg_day"), sep = "")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  }
+  
+  # Read in files and build data.frame
+  load(files[grep(paste("_", subpops, sep = ""), files)])
+  samps <- as.matrix(lPsampsgm)
+  result.med <- apply(samps, 2, mean)
+  result.bar <- mean(apply(samps, 1, mean))
+  dta <- data.frame(colnames(samps), exp(result.med))
+  colnames(dta) <- c("CAS", subpops)
+  
+  dta.2 <- rbind(cbind(dta, "Phase" = rep(phases[j], dim(dta)[1])), dta.2)
+}
+
+# Get in the right format
+dfT <- as.data.frame(with(dta.2[,colnames(dta.2) %in% c("CAS", "Phase", "Total")], 
+            tapply(Total, list(CAS, Phase), function(x) mean(x, na.rm = TRUE))))
+```
+   
+            
+### Add chemical class
+```{r nameParents}
+map <- map[map$CAS %in% row.names(dfT),]  
+map <- map[,c(2,3,4,7,8,9)]
+classTable <- as.data.frame(read_excel("/ccte/home1/zstanfie/MetaboliteInference/allPhasesAllChems_ChemClass.xlsx", sheet = 1))
+map$CAS.1 <- gsub(" ", "", map$CAS.1)
+map$ChemClass <- apply(map, 1, function(x) classTable$Column4[match(x[5], classTable$Column1)])
+```
+
+
+### Cluster exposure profiles and save plot 
+```{r parentPlot}
+df <- dfT[,c(9,1:8)]  
+df <- log(df)
+df2 <- df
+# There missing values in our data frame, but this is not allowed when clustering
+# Impute missing values with the median exposure over all chemicals for a cohort
+for (i in 1:dim(df2)[2]){
+  df2[is.na(df2[,i]), i] <- median(df2[,i], na.rm = TRUE)
+}
+dists <- dist(df2, method = "euclidean")
+dists <- hclust(dists, method = "complete") # contains the ordering of the rows
+df <- df[dists$order,]
+
+# Create row annotation for the chemical class
+tmp <- as.character(map$ChemClass[match(row.names(df), map$CAS)])
+row.anno <- data.frame("ChemicalClass" = tmp, row.names = row.names(df))
+row.anno$ChemicalClass <- as.factor(row.anno$ChemicalClass) 
+cols <- primary.colors(length(unique(row.anno$ChemicalClass)))
+anno.cols <- cols[1:length(unique(row.anno$ChemicalClass))]
+names(anno.cols) <- levels(row.anno$ChemicalClass)
+anno.cols <- list(ChemicalClass = anno.cols)
+pheatmap(df, color = colorRampPalette(brewer.pal(n = 7, name = "YlOrRd"))(100),
+         cluster_cols = FALSE, cluster_rows = FALSE, annotation_row = row.anno,
+         main = "Parent Chemicals Log of Median Exposure Estimates (mg/kg/day) by Cohort", fontsize = 18,
+         fontsize_row = 8, fontsize_col = 19, angle_col = 0, annotation_colors = anno.cols,
+         annotation_names_row = FALSE, na_col = "grey", 
+         filename = paste("ExpEstHeatmapEuclid_all_", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = ""),
+         width = 19, height = 17, silent = TRUE)
+```         
+         
+         
+         
+## Generate Metabolite Heatmap
+### Declare data objects and obtain the Markov chains for the metabolites
+```{r readlUs}
+path_to_lUs <- "/ccte/home1/zstanfie/MetaboliteInference/testingAllPhases"
+map <- read_excel("/ccte/home1/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 3)
+
+dta.m <- c()
+for (j in 1:length(phases)){
+  
+  # Obtain file names for lUs
+  if (is.null(path_to_lUs)){
+    files <- list.files(path = ".", pattern = "lU-gm_kg_day")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  } else {
+    path <- file.path(path_to_lUs, phases[j])
+    files <- paste(path, "/", list.files(path = path, pattern = "lU-gm_kg_day"), sep = "")
+    dates <- "2021-05-11"
+    files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  }
+  
+  # Read in files and build data.frame
+  load(files[grep(paste("_", subpops, sep = ""), files)])
+  samps <- as.matrix(lU)
+  result.med <- apply(samps, 2, mean)
+  result.bar <- mean(apply(samps, 1, mean))
+  dta <- data.frame(colnames(samps), exp(result.med))
+  colnames(dta) <- c("CAS", subpops)
+      
+  dta.m <- rbind(cbind(dta, "Phase" = rep(phases[j], dim(dta)[1])), dta.m)
+}
+
+dfTm <- as.data.frame(with(dta.m[,colnames(dta.m) %in% c("CAS", "Phase", "Total")], 
+            tapply(Total, list(CAS, Phase), function(x) mean(x, na.rm = TRUE))))
+```
+
+
+### Add class lables
+```{r nameMetabs}
+map <- map[map$CAS.1 %in% row.names(dfTm),]  
+map <- map[,c(2,3,4,7,8,9)]
+classTable <- read_excel("/ccte/home1/zstanfie/MetaboliteInference/allPhasesAllChems_ChemClass.xlsx", sheet = 1)
+map$CAS.1 <- gsub(" ", "", map$CAS.1)
+map$ChemClass <- apply(map, 1, function(x) classTable$Column4[match(x[5], classTable$Column1)])
+```
+
+
+### Cluster exposure profiles and save plot
+```{r metabPlot}
+df <- dfTm[,c(9,1:8)]
+df <- log(df)
+df2 <- df
+# There missing values in our data frame, but this is not allowed when clustering
+# Impute missing values with the median exposure over all chemicals for a cohort
+for (i in 1:dim(df2)[2]){
+  df2[is.na(df2[,i]), i] <- median(df2[,i], na.rm = TRUE)
+}
+dists <- dist(df2)
+dists <- hclust(dists, method = "complete") # contains the ordering of the rows
+df <- df[dists$order,]
+
+# Create row annotation for the chemical class
+tmp <- as.character(map$ChemClass[match(row.names(df), map$CAS.1)])
+row.anno <- data.frame("ChemicalClass" = tmp, row.names = row.names(df))
+row.anno$ChemicalClass <- as.factor(row.anno$ChemicalClass) 
+cols <- primary.colors(length(unique(row.anno$ChemicalClass)))
+anno.cols <- cols[1:length(unique(row.anno$ChemicalClass))]
+names(anno.cols) <- levels(row.anno$ChemicalClass)
+anno.cols <- list(ChemicalClass = anno.cols)
+pheatmap(df, color = colorRampPalette(brewer.pal(n = 7, name = "YlOrRd"))(100),
+         cluster_cols = FALSE, cluster_rows = FALSE, annotation_row = row.anno,
+         main = "Metabolite Log Mean Concentration (mg/kg/day) by Cohort", fontsize = 17,
+         fontsize_row = 8, angle_col = 0, annotation_colors = anno.cols,
+         annotation_names_row = FALSE, na_col = "grey", 
+         filename = paste("ExpEstHeatmapEuclid_allMetabs_", format(Sys.time(), "%Y-%m-%d"), ".pdf", sep = ""),
+         width = 16, height = 16, silent = TRUE)
+```
+
