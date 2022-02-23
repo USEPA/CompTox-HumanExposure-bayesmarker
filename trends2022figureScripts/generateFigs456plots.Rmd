@@ -1,0 +1,339 @@
+---
+title: "Compare Exposure Trends Across All Population Groups for a Set of Chemicals"
+author: "Zachary Stanfield"
+date: "2/23/2022"
+output: html_document
+---
+
+from "Characterizing Exposure Trends from NHANES Urine Biomonitoring Data"
+
+Zachary Stanfield, R. Woodrow Setzer, Victoria Hull, Risa R. Sayre, Kristin K. Isaacs, John F. Wambaugh
+
+(Insert Journal Name, issue, data, and page numbers)
+
+(Insert link to DOI)
+
+# Description
+This document recreates figures 4, 5, and 6 from the paper.  It uses the Markov chains calculated
+from the main bayesmarker pipeline (see the vignette calculateExposureInferences.Rmd) to plot 
+individual trend lines (with median exposure and 95% CI for each point) for all population groups 
+for individual chemicals.
+
+## Prepare for session 
+### Load relevant libraries
+```{r setup}
+library(readxl)
+library(reshape2)
+library(stringr)
+library(ggplot2)
+```
+
+### Declare some needed objects
+```{r objs}
+subpops <- c("Total", "Male", "Female", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
+             "ReproAgeFemale", "BMI <= 30", "BMI > 30")
+names(subpops) <- c("Total", "Male", "Female", "6 - 11 years", "12 - 19 years", "20 - 65 years", "66 years and older",
+                    "ReproAgeFemale", "BMI_le_30", "BMI_gt_30")
+phases <- c("99-00", "01-02", "03-04", "05-06", "07-08", "09-10", "11-12", "13-14", "15-16")
+path_to_lPs <- "/ccte/home1/zstanfie/MetaboliteInference/testingAllPhases"
+phthalates <- c("84-66-2", "117-81-7", "28553-12-0", "84-69-5")
+names(phthalates) <- c("Diethyl phthalate", "Di-2-ethylhexyl phthalate", "Di-isononyl phthalate", "Di-isobutyl phthalate")
+parabens <- c("120-47-8", "94-13-3", "94-26-8", "99-76-3")
+names(parabens) <- c("Ethyl paraben", "n-propyl paraben", "Butyl paraben", "Methyl paraben")
+others <- c("7440-43-9", "64436-13-1", "68-12-2", "107-13-1")
+names(others) <- c("Cadmium", "Arsenobetaine", "N,N-Dimethylformamide", "Acrylonitrile")
+```
+
+## Retrieve Markov chains and organize into dataframs
+```{r getlPs}
+# Use 1 data object for each final plot point item (median exposure, upper value 
+# of the 95% CI, and lower value)
+dta.2 <- c()
+dta.2.low <- c()
+dta.2.up <- c()
+for (j in 1:length(phases)){
+  
+  # Obtain file names for lPsamps
+  if (is.null(path_to_lPs)){
+      files <- list.files(path = ".", pattern = "lPsamps-gm_kg_day")
+  } else {
+    path <- file.path(path_to_lPs, phases[j])
+      files <- paste(path, "/", list.files(path = path, pattern = "lPsamps-gm_kg_day"), sep = "")
+      dates <- "2021-05-11"
+      files <- files[unlist(sapply(dates, function(x) grep(x, files)))]
+  }
+  
+  # Read in files and build data.frame
+  for (i in 1:length(subpops)){
+    if (length(grep(paste("_", subpops[i], sep = ""), files)) == 0){
+      # For cases when data is missing for the supbop 
+      # Ok to call dta.1 here b/c data is never missing for the first subpop
+      chems <- unique(dta.1$CAS)
+      dta <- data.frame(matrix(data = NA, nrow = length(chems), ncol = 2))
+      colnames(dta) <- c("CAS", subpops[i])
+      row.names(dta) <- chems
+      dta.1 <- merge(dta.1, dta, by = "CAS", all.x = TRUE)
+    } else {
+      load(files[grep(paste("_", subpops[i], sep = ""), files)])
+      samps <- as.matrix(lPsampsgm)
+      # Having all NAs for a column causes an error
+      rmind <- unlist(apply(samps, 2, function(x) sum(is.na(x)) == length(x)))
+      samps <- samps[,!rmind]
+      result.med <- apply(samps, 2, mean)
+      result.bar <- mean(apply(samps, 1, mean))
+      # Get 95th Percentile
+      result.CI <- t(apply(samps, 2, function(x) quantile(x, probs = c(0.0275, 0.975))))
+      dta <- data.frame(colnames(samps), exp(result.med))
+      dta.low <- data.frame(colnames(samps), exp(result.CI[,1]))
+      dta.up <- data.frame(colnames(samps), exp(result.CI[,2]))
+      colnames(dta) <- c("CAS", subpops[i])
+      colnames(dta.low) <- c("CAS", paste(subpops[i], "_low95", sep = ""))
+      colnames(dta.up) <- c("CAS", paste(subpops[i], "_up95", sep = ""))
+      if (i > 1){
+        dta.1 <- merge(dta.1, dta, by = "CAS", all.x = TRUE)
+        dta.1.low <- merge(dta.1.low, dta.low, by = "CAS", all.x = TRUE)
+        dta.1.up <- merge(dta.1.up, dta.up, by = "CAS", all.x = TRUE)
+      } else {
+        dta.1 <- dta
+        dta.1.low <- dta.low
+        dta.1.up <- dta.up
+      }
+    }
+  }
+  dta.2 <- rbind(cbind(dta.1, "Phase" = rep(phases[j], dim(dta.1)[1])), dta.2)
+  dta.2.low <- rbind(cbind(dta.1.low, "Phase" = rep(phases[j], dim(dta.1.low)[1])), dta.2.low)
+  dta.2.up <- rbind(cbind(dta.1.up, "Phase" = rep(phases[j], dim(dta.1.up)[1])), dta.2.up)
+}
+```
+
+## Reduce data to just the chemicals we will eventually plot
+```{r redChems}
+dta.2 <- dta.2[dta.2$CAS %in% c(phthalates, parabens, others),]
+dta.2.low <- dta.2.low[dta.2.low$CAS %in% c(phthalates, parabens, others),]
+dta.2.up <- dta.2.up[dta.2.up$CAS %in% c(phthalates, parabens, others),]
+```
+
+
+## Coerce data into a set of CASxCohort matrices for each population group
+This will make them easier to work with later on.  Impute missing values to help visualization
+of exposure trend changes.  Keep track of which values are imputed so we can indicate them
+in the final plot.
+```{r buildDFs}
+alldfs <- list()
+impdfs <- list()
+for (k in 1:length(subpops)){
+  # Extract subpop matrix
+  df <- dta.2[,colnames(dta.2) %in% c("CAS", "Phase", unname(subpops[k]))]
+  df <- tapply(df[,2], list(df$CAS, df$Phase), function(x) mean(x, na.rm = TRUE))
+  df <- df[,c(9,1:8)]
+  indNaN <- is.nan(df)
+  df[indNaN] <- NA
+  df <- log(df)
+  
+  # Keep track of imputed values
+  impdfs[[k]] <- df
+  impdfs[[k]][is.na(df)] <- "Yes"
+  impdfs[[k]][!(df == "Yes")] <- "No"
+  impdfs[[k]] <- melt(impdfs[[k]])
+  colnames(impdfs[[k]]) <- c("Chemical", "Cohort", "Imputed")
+  
+  # Value imputation
+  for (i in 1:dim(df)[1]){  # Step through each chemical
+    allVals <- which(!is.na(df[i,]))
+    firstVal <- allVals[1]
+    lastVal <- allVals[length(allVals)]
+    if (length(allVals) == 0){    # When all data is missing (either not measured in cohorts or estimate is NA)
+      df[i,] <- NA
+      next
+    }
+    if (firstVal != 1){ # Use the value for the first earliest non-missing cohort for all those preceeding
+      df[i, 1:(firstVal - 1)] <- df[i,firstVal]  # in other words, propogate first measured value backwards
+    }
+    if (lastVal != dim(df)[2]){ # propogate the last value forwards
+      df[i, (lastVal + 1):dim(df)[2]] <- df[i,lastVal]
+    }
+    miss <- setdiff(seq(firstVal, lastVal), allVals)
+    
+    for (j in miss){
+      below <- max(which((j - allVals) > 0))  # index with closest previous value
+      above <- allVals[Position(function(x) x > j, allVals)]  # index with closest newer value
+      df[i, j] <- mean(df[i,c(below,above)])  # use the mean of these two as the imputed value
+    }
+  }
+  
+  # Record the df
+  alldfs[[k]] <- df 
+  
+  # Ensure df and dftot have matching chemicals
+  #tmpDF <- dftot[row.names(dftot) %in% row.names(df),]
+  
+}
+names(alldfs) <- subpops
+```
+
+
+# Need to create a list of dfs for both upper and lower CI, like alldfs above
+```{r CIdfs}
+alldfs.low <- list()
+for (i in 1:length(subpops)){
+  df <- dta.2.low[,colnames(dta.2.low) %in% c("CAS", "Phase", paste(unname(subpops[i]), "_low95", sep = ""))]
+  df <- tapply(df[,2], list(df$CAS, df$Phase), function(x) mean(x, na.rm = TRUE))
+  df <- df[,c(9,1:8)]
+  indNaN <- is.nan(df)
+  df[indNaN] <- NA
+  df <- log(df)
+  alldfs.low[[i]] <- df
+}
+names(alldfs.low) <- names(alldfs)
+
+alldfs.up <- list()
+for (i in 1:length(subpops)){
+  df <- dta.2.up[,colnames(dta.2.up) %in% c("CAS", "Phase", paste(unname(subpops[i]), "_up95", sep = ""))]
+  df <- tapply(df[,2], list(df$CAS, df$Phase), function(x) mean(x, na.rm = TRUE))
+  df <- df[,c(9,1:8)]
+  indNaN <- is.nan(df)
+  df[indNaN] <- NA
+  df <- log(df)
+  alldfs.up[[i]] <- df
+}
+names(alldfs.up) <- names(alldfs)
+```
+
+
+## Create main plot data frame by combining all the subpop data frames
+```{r getPlotDF}
+# Switch to using chemical names rather than CAS
+map <- read_excel("/ccte/home1/zstanfie/MetaboliteInference/NHANEScodes_ZS_2020-12-15.xlsx", sheet = 3)
+tomatch <- row.names(alldfs$Total)
+indName <- match(tomatch, map$CAS)
+indNames <- map$Name[indName]
+
+# Loop by subpop to add all data to the same object
+pdf_final <- c()
+for (i in 1:length(subpops)){
+  pdf1 <- data.frame("Chemical" = indNames, "temp" = alldfs[[i]])
+  pdf1.low <- data.frame("Chemical" = indNames, "lower95" = alldfs.low[[i]])
+  pdf1.up <- data.frame("Chemical" = indNames, "upper95" = alldfs.up[[i]])
+  colnames(pdf1) <- gsub("temp", names(subpops)[i], colnames(pdf1))
+  pdf1 <- melt(pdf1)
+  pdf1.low <- melt(pdf1.low)
+  pdf1.up <- melt(pdf1.up)
+  sepcols <- str_split_fixed(pdf1$variable, "\\.", 2)
+  pdf1 <- cbind(pdf1[,c(1,3)], sepcols, pdf1.low$value, pdf1.up$value)
+  colnames(pdf1) <- c("Chemical", "Exposure", "Population", "Cohort", "lower95", "upper95")
+  pdf1$Exposure <- exp(pdf1$Exposure)
+  pdf1$lower95 <- exp(pdf1$lower95)
+  pdf1$upper95 <- exp(pdf1$upper95)
+  
+  # Need to concatenate the imputed values as well to add to the final df
+  imptemp_col <- c()
+  for (j in 1:length(phases)){
+    imptemp <- impdfs[[i]][impdfs[[i]]$Cohort == phases[j],]
+    imptemp_col <- c(imptemp_col, imptemp$Imputed)
+  }
+  pdf1$Imputed <- imptemp_col
+  
+  # We can now contribute the df for this population to the final df
+  pdf_final <- rbind(pdf_final, pdf1)
+}
+```
+
+
+## Setting the df factors up
+```{r factors}
+pdf_final$Chemical <- factor(pdf_final$Chemical, levels = map$Name[indName])
+pdf_final$Cohort <- as.factor(pdf_final$Cohort)
+pdf_final$Cohort <- factor(pdf_final$Cohort, levels = levels(pdf_final$Cohort)[c(9,1:8)])
+pdf_final$Imputed <- as.factor(pdf_final$Imputed)
+levels(pdf_final$Imputed) <- c("No", "Yes")
+pdf_final$Population <- as.factor(pdf_final$Population)
+pdf_final$Population <- factor(pdf_final$Population, levels = levels(pdf_final$Population)[c(10,8,7,3,1,2,4,9,6,5)])
+```
+
+
+## Set some plot elements
+```{r plotParams}
+myColors <- c("Black", rainbow(length(levels(pdf_final$Population)) - 1))
+names(myColors) <- levels(pdf_final$Population)
+alphas <- c("Total" = 1, "Male" = 0.5, "Female" = 0.5, "6 - 11 years" = 0.5, "12 - 19 years" = 0.5, 
+            "20 - 65 years" = 0.5, "66 years and older" = 0.5,
+            "ReproAgeFemale" = 0.5, "BMI <= 30" = 0.5, "BMI > 30" = 0.5)
+```
+
+
+## Make the plots
+```{r makePlots, echo=TRUE}
+# Phthalates
+pht_df <- pdf_final[pdf_final$Chemical %in% names(phthalates),]
+pht_df$Chemical <- factor(pht_df$Chemical, levels = names(phthalates))
+p <- ggplot(pht_df, aes(x = Cohort, y = Exposure, group = Population, color = Population, alpha = Population)) +
+  geom_point(aes(shape = Imputed), size = 2.25) +
+  scale_shape_manual(values = c(19,1)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = lower95, ymax = upper95), width = 0.2, position=position_dodge(0.25)) +
+  scale_color_manual(name = "Population", values = myColors) +
+  scale_alpha_manual(values = alphas) +
+  scale_y_log10() +
+  ylab("Exposure (mg/kg/day)") +
+  ggtitle("Phthalate Exposure Trends") +
+  facet_wrap(.~Chemical, nrow = 2, scales = "free_y") +
+  theme_set(theme_gray(base_size = 14)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) +
+  guides(size = "legend", alpha = "none")
+print(p)
+pdf(file = "SubpopExposureTrend_Phthalates.pdf", width = 13, height = 11)
+  print(p)
+dev.off()
+
+# Parabens
+bens_df <- pdf_final[pdf_final$Chemical %in% names(parabens),]
+bens_df$Chemical <- factor(bens_df$Chemical, levels = names(parabens))
+p <- ggplot(bens_df, aes(x = Cohort, y = Exposure, group = Population, color = Population, alpha = Population)) +
+  geom_point(aes(shape = Imputed), size = 2.25) +
+  scale_shape_manual(values = c(19,1)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = lower95, ymax = upper95), width = 0.2, position=position_dodge(0.25)) +
+  scale_color_manual(name = "Population", values = myColors) +
+  scale_alpha_manual(values = alphas) +
+  scale_y_log10() +
+  ylab("Exposure (mg/kg/day)") +
+  ggtitle("Parabens Exposure Trends") +
+  facet_wrap(.~Chemical, nrow = 2, scales = "free_y") +
+  theme_set(theme_gray(base_size = 14)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) +
+  guides(size = "legend", alpha = "none")
+print(p)
+pdf(file = "SubpopExposureTrend_Parabens.pdf", width = 13, height = 11)
+  print(p)
+dev.off()
+
+# Others
+others_df <- pdf_final[pdf_final$Chemical %in% names(others),]
+others_df$Chemical <- factor(others_df$Chemical, levels = names(others))
+p <- ggplot(others_df, aes(x = Cohort, y = Exposure, group = Population, color = Population, alpha = Population)) +
+  geom_point(aes(shape = Imputed), size = 2.25) +
+  scale_shape_manual(values = c(19,1)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = lower95, ymax = upper95), width = 0.2, position=position_dodge(0.25)) +
+  scale_color_manual(name = "Population", values = myColors) +
+  scale_alpha_manual(values = alphas) +
+  scale_y_log10() +
+  ylab("Exposure (mg/kg/day)") +
+  ggtitle("Atypical Exposure Trends") +
+  facet_wrap(.~Chemical, nrow = 2, scales = "free_y") +
+  theme_set(theme_gray(base_size = 14)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) +
+  guides(size = "legend", alpha = "none")
+print(p)
+pdf(file = "SubpopExposureTrend_Workplace.pdf", width = 13, height = 11)
+  print(p)
+dev.off()
+
+```
+
+
+
+
