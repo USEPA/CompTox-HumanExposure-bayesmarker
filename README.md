@@ -6,8 +6,11 @@ This package provides a modeling approach that uses biomonitoring data and chemi
 information to estimate chemical exposure intake rates while carefully characterizing the uncertainties. 
 Bayesian methods are provided to infer ranges of exposure for parent chemicals consistent with 
 biomarkers identified in urine samples from the U.S population by the National Health and 
-Nutrition Examination Survey (NHANES). Metabolites arelinked to potential parent chemicals 
-using the NHANES reports and text mining of PubMed abstracts.
+Nutrition Examination Survey (NHANES). Metabolites are linked to potential parent chemicals 
+using the NHANES reports and text mining of PubMed abstracts. The inferred parent chemical
+exposures have been incorporated into the US EPA's CompTox Chemicals Dashboard for chemicals
+with available data. The exposure predictions can be found for an individual chemical by clicking 
+Exposure -> Monitoring Data (for example: comptox.epa.gov/dashboard/chemical/monitoring-data/DTXSID7020182). 
 
 
 ## Background
@@ -30,7 +33,7 @@ allow the identification of public health priority chemicals via risk-based bioa
 * Getting Started with R Package bayesmarker from the R command line
 ``` 
 library(devtools)
-install_github("HumanExposure/bayesmarker")
+install_github("USEPA/CompTox-HumanExposure-bayesmarker")
 ```
 * RStudio provides a menu ‘Install Packages’ under ‘Tools’ tab
 * Load the bayesmarker data and functions
@@ -38,10 +41,6 @@ install_github("HumanExposure/bayesmarker")
 library(bayesmarker)
 ```
 * Check what version you are using
-```
-library(bayesmarker)
-```
-* Check what version you are using 
 ```
 packageVersion(bayesmarker)
 ```
