@@ -82,13 +82,13 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
 
   #### Data checks
   print("Checking input codes file")
-  if (any(convtbl$CAS == "")){
-    missing <- sum(convtbl$CAS == "")
-    convtbl <- convtbl[!(convtbl$CAS == ""),]
-    phaseTbl[[which(names(phaseTbl) == "")]] <- NULL
+  if (any(is.na(convtbl$CAS))){
+    missing <- sum(is.na(convtbl$CAS))
+    convtbl <- convtbl[!is.na(convtbl$CAS),]
+    phaseTbl[[which(is.na(names(phaseTbl)))]] <- NULL
     print(paste("Warning:  removed ", missing, " rows due to missing CAS"), sep = "")
   }
-  tmp2 <- do.call(rbind, lapply(phaseTbl, function(x) c(length(unique(x)), length(x))))
+  tmp2 <- do.call(rbind, lapply(phaseTbl, function(x) c(length(unique(na.omit(x))), length(na.omit(x)))))
   if (any(tmp2[,1] != tmp2[,2])) {
     issue <- which(tmp2[,1] != tmp2[,2])
     print("Duplicate chemical identifier - cohort pair(s) detected. Each chemical identifier must have a
@@ -120,6 +120,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   ## First, run through all the input files and estimate quantiles.
   demofiles <- wtvars$demofile
   names(demofiles) <- wtvars$sample
+
 
   if (group){
     tmp2 <- list()
@@ -179,6 +180,12 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
     #  wtvars <- wtvars[!wtvars$wtvariable == "",]
     #}
     tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
+
+    # Need a check in case a file in the input tables wasn't found on the call to NHANES
+    localFiles <- list.files(path = datapaths)
+    keepFiles <- sapply(tmp$NHANESfile, function(x) ifelse(length(grep(x, localFiles, ignore.case = TRUE) > 0), TRUE, FALSE))
+    tmp <- tmp[keepFiles,]
+
     datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], paste(tolower(tmp$NHANESfile), ".xpt", sep = ""))
     names(datafiles) <- tmp$NHANESfile
     demofiles <- file.path(datapaths[as.character(tmp$recent_sample)], demofiles[as.character(tmp$recent_sample)])
@@ -193,9 +200,12 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
 
     scaledata <- vector("list", length(datafiles))
     chemvars <- split(as.character(convtbl$NHANEScode), f=convtbl$NHANESfile)
-    chemwt <- wtvars$wtvariable
-    names(chemwt) <- wtvars$file
-
+    # Again, for files unable to be pulled from NHANES website
+    chemvars <- chemvars[names(chemvars) %in% tmp$NHANESfile]
+    # Final needed inputs
+    ind <- match(paste(tmp$NHANESfile, ".XPT", sep = ""), wtvars$file)
+    chemwt <- wtvars$wtvariable[ind]
+    names(chemwt) <- wtvars$file[ind]
 
     print("Starting geometric mean estimations")
     scaledata <-
@@ -215,20 +225,20 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
                                     MaximumAge=150)
                },
                mc.preschedule=FALSE, mc.cores = min(c(length(datafiles), 7)))
-#    for (i in 1:length(datafiles)){
-#      print(datafiles[i])
-#      scaledata[[i]] <- getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
-#                                           chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
-#                                           chemvars=chemvars[[names(datafiles)[i]]],
-#                                           CreatFun=creatinine,
-#                                           bodywtfile=bwtfiles[names(datafiles)[i]],
-#                                           creatfile=creatfiles[names(datafiles)[i]],
-#                                           Q=c(50),
-#                                           code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
-#                                                                   codename="NHANEScode",CAS="CAS",chemname="Name"),
-#                                           LODfilter=FALSE,
-#                                           MaximumAge=150)
-#   }
+    for (i in 1:length(datafiles)){
+      print(datafiles[i])
+      scaledata[[i]] <- getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
+                                           chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
+                                           chemvars=chemvars[[names(datafiles)[i]]],
+                                           CreatFun=creatinine,
+                                           bodywtfile=bwtfiles[names(datafiles)[i]],
+                                           creatfile=creatfiles[names(datafiles)[i]],
+                                           Q=c(50),
+                                           code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
+                                                                   codename="NHANEScode",CAS="CAS",chemname="Name"),
+                                           LODfilter=FALSE,
+                                           MaximumAge=150)
+   }
 
   }
 
