@@ -4,12 +4,15 @@
 \alias{get_NHANES_data}
 \title{get_NHANES_data}
 \usage{
-get_NHANES_data(codes_file = NULL, save_directory = NULL)
+get_NHANES_data(codes_file = NULL, cohort = NULL, save_directory = NULL)
 }
 \arguments{
 \item{codes_file}{Manually created xls or xlsx file containing 3 sheets:  1. NHANES chemicals to include (with identifier,
 code, file, demographic, and units), 2. Associated weights, filenames, and column names associated with each phase used,
 and 3. Parent-metabolite map containing chemical identifiers and molecular weights.}
+
+\item{cohort}{String or character vector indicating which cohorts to limit the data downloads to. Cohorts should be
+of length 5 representing the shortened dates for the cohort. For example "15-16" or c("01-02", "03-04").}
 
 \item{save_directory}{String providing the directory in which to save the NHANES data files.  If left as the default,
 NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.}

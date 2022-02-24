@@ -9,6 +9,8 @@
 #' @param codes_file Manually created xls or xlsx file containing 3 sheets:  1. NHANES chemicals to include (with identifier,
 #' code, file, demographic, and units), 2. Associated weights, filenames, and column names associated with each phase used,
 #' and 3. Parent-metabolite map containing chemical identifiers and molecular weights.
+#' @param cohort String or character vector indicating which cohorts to limit the data downloads to. Cohorts should be
+#'               of length 5 representing the shortened dates for the cohort. For example "15-16" or c("01-02", "03-04").
 #' @param save_directory String providing the directory in which to save the NHANES data files.  If left as the default,
 #'                       NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.
 #'
@@ -20,7 +22,7 @@
 #' @examples
 #'
 #'
-get_NHANES_data <- function(codes_file = NULL, save_directory = NULL) {
+get_NHANES_data <- function(codes_file = NULL, cohort = NULL, save_directory = NULL) {
 
   if (is.null(codes_file)){
     print("Error: please provide a file name")
@@ -29,13 +31,17 @@ get_NHANES_data <- function(codes_file = NULL, save_directory = NULL) {
 
   codes <- as.data.frame(read_excel(codes_file, sheet = 1))
   weights <- as.data.frame(read_excel(codes_file, sheet = 2))
-  mapping <- as.data.frame(read_excel(codes_file, sheet = 3))
 
 
-  # Generate list of needed laboratory files (has metaboite concentration measurements)
+  # Generate list of needed laboratory files (has metabolite concentration measurements)
   samps <- unique(codes$recent_sample)
-  labFiles <- list()
 
+  # Limit by cohort
+  if (!is.null(cohort)){
+    samps <- samps[samps %in% cohort]
+  }
+
+  labFiles <- list()
   labFiles <- lapply(samps, function(x) unique(codes$NHANESfile[codes$recent_sample == x]))
   names(labFiles) <- samps
 
