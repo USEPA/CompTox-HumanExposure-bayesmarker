@@ -596,7 +596,7 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     ## -----------------------------------------------------------------------
     irow <- irow + 1
 
-    out <- svyquantile(formla, design, Q, ci=TRUE, se=TRUE,
+    out <- oldsvyquantile(formla, design, Q, ci=TRUE, se=TRUE,
                        na.rm=TRUE, interval.type="betaWald", ties="discrete")
     qout[irow,"NHANEScode"] <- nm
     qout[irow,"Chem"] <- nms[i,"Chem"]
@@ -678,7 +678,7 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     ## ------------------------------ Gender ---------------------------------
     ## -----------------------------------------------------------------------
 
-    out2 <- svyby(formula=formla, by=~RIAGENDR, design, FUN=svyquantile,
+    out2 <- svyby(formula=formla, by=~RIAGENDR, design, FUN=oldsvyquantile,
                   quantiles=Q, ci=TRUE,
                   na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci")
     if (lognormfit) {
@@ -768,7 +768,7 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     ## ----------------------------- Age -------------------------------------
     ## -----------------------------------------------------------------------
 
-    out3 <- svyby(formla, by=~AgeGroup, design, FUN=svyquantile, quantiles=Q, ci=TRUE,
+    out3 <- svyby(formla, by=~AgeGroup, design, FUN=oldsvyquantile, quantiles=Q, ci=TRUE,
                   na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci")
     NAges <- nlevels(factor(out3$AgeGroup))
     if (lognormfit) {
@@ -859,7 +859,7 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     ## ---------------------------- Obesity ----------------------------------
     ## -----------------------------------------------------------------------
 
-    out4 <- svyby(formla, by=~Obesity, design, FUN=svyquantile, quantiles=Q, ci=TRUE,
+    out4 <- svyby(formla, by=~Obesity, design, FUN=oldsvyquantile, quantiles=Q, ci=TRUE,
                   na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci")
     if (lognormfit) {
       ## Fit lognormal
@@ -947,7 +947,7 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     ## -----------------------------------------------------------------------
 
     dsgnsub <- subset(design, ReproAgeFemale)
-    out5 <- svyquantile(formla, dsgnsub, Q, ci=TRUE, se=TRUE,
+    out5 <- oldsvyquantile(formla, dsgnsub, Q, ci=TRUE, se=TRUE,
                         na.rm=TRUE, interval.type="betaWald", ties="discrete")
     irow <- irow + 1
     qout[irow,"NHANEScode"] <- nm

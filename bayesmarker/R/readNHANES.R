@@ -234,6 +234,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
                                            bodywtfile=bwtfiles[names(datafiles)[i]],
                                            creatfile=creatfiles[names(datafiles)[i]],
                                            Q=c(50),
+                                           codes_table = convtbl,
                                            code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
                                                                    codename="NHANEScode",CAS="CAS",chemname="Name"),
                                            LODfilter=FALSE,
