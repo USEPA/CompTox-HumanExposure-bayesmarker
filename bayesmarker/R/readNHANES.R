@@ -17,6 +17,9 @@
 #' cycle. Other options include "oldest", "all"
 #' @param save_directory String providing the directory in which to save the NHANES data files.  If left as the default,
 #'                       NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.
+#' @param cores Allows for the call to getNhanesQuantiles() to be run in parallel for the set of data files (if not
+#'              combining cohorts) or set of metabolite codes (if combining cohort data). Default is NULL, which uses
+#'              a traditional for loop.
 #'
 #' @importFrom readxl read_excel
 #' @importFrom parallel mclapply
@@ -36,7 +39,7 @@
 #'
 #' @examples # readNHANES("NHANEScodes.xlsx", "rawData")
 #'
-readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_directory = ".") {
+readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_directory = ".", cores = NULL) {
 
   ## Curated EXCEL spreadsheet giving information about the variables and files used in
   ## this analysis
@@ -153,23 +156,40 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
     chemwt <- lapply(tmp2, function(x) wtvars$wtvariable[match(x[,2], wtvars$file)])
 
     print("Starting geometric mean estimations")
-    scaledata <-
-      mclapply(1:length(tmp2),
-               FUN=function(i) {
-                 getNhanesQuantiles(demof=demofiles[[i]], chemdtaf=datafiles[[i]], lognormfit=TRUE,
-                                    chem2yrwt=chemwt[[i]],
-                                    chemvars=chemvars[i],
-                                    CreatFun=creatinine,
-                                    bodywtfile=bwtfiles[[i]],
-                                    creatfile=creatfiles[[i]],
-                                    Q=c(50),
-                                    codes_table = convtbl,
-                                    code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
-                                              codename="NHANEScode",CAS="CAS",chemname="Name"),
-                                    LODfilter=FALSE,
-                                    MaximumAge=150)
-               },
-               mc.preschedule=FALSE, mc.cores=7)
+    if(!is.null(cores)){
+      scaledata <-
+        mclapply(1:length(tmp2),
+                 FUN=function(i) {
+                   getNhanesQuantiles(demof=demofiles[[i]], chemdtaf=datafiles[[i]], lognormfit=TRUE,
+                                      chem2yrwt=chemwt[[i]],
+                                      chemvars=chemvars[i],
+                                      CreatFun=creatinine,
+                                      bodywtfile=bwtfiles[[i]],
+                                      creatfile=creatfiles[[i]],
+                                      Q=c(50),
+                                      codes_table = convtbl,
+                                      code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
+                                                codename="NHANEScode",CAS="CAS",chemname="Name"),
+                                      LODfilter=FALSE,
+                                      MaximumAge=150)
+                 },
+                 mc.preschedule=FALSE, mc.cores=cores)
+    } else {
+      for (i in 1:length(tmp2)){
+        scaledata[[i]] <- getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
+                                             chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
+                                             chemvars=chemvars[[names(datafiles)[i]]],
+                                             CreatFun=creatinine,
+                                             bodywtfile=bwtfiles[names(datafiles)[i]],
+                                             creatfile=creatfiles[names(datafiles)[i]],
+                                             Q=c(50),
+                                             codes_table = convtbl,
+                                             code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
+                                                       codename="NHANEScode",CAS="CAS",chemname="Name"),
+                                             LODfilter=FALSE,
+                                             MaximumAge=150)
+      }
+    }
 
   } else {
 
@@ -208,39 +228,41 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
     names(chemwt) <- wtvars$file[ind]
 
     print("Starting geometric mean estimations")
-    scaledata <-
-      mclapply(1:length(datafiles),
-               FUN=function(i) {
-                 getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
-                                    chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
-                                    chemvars=chemvars[[names(datafiles)[i]]],
-                                    CreatFun=creatinine,
-                                    bodywtfile=bwtfiles[names(datafiles)[i]],
-                                    creatfile=creatfiles[names(datafiles)[i]],
-                                    Q=c(50),
-                                    codes_table = convtbl,
-                                    code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
-                                              codename="NHANEScode",CAS="CAS",chemname="Name"),
-                                    LODfilter=FALSE,
-                                    MaximumAge=150)
-               },
-               mc.preschedule=FALSE, mc.cores = min(c(length(datafiles), 7)))
-    for (i in 1:length(datafiles)){
-      print(datafiles[i])
-      scaledata[[i]] <- getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
-                                           chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
-                                           chemvars=chemvars[[names(datafiles)[i]]],
-                                           CreatFun=creatinine,
-                                           bodywtfile=bwtfiles[names(datafiles)[i]],
-                                           creatfile=creatfiles[names(datafiles)[i]],
-                                           Q=c(50),
-                                           codes_table = convtbl,
-                                           code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
-                                                                   codename="NHANEScode",CAS="CAS",chemname="Name"),
-                                           LODfilter=FALSE,
-                                           MaximumAge=150)
-   }
-
+    if (!is.null(cores)){
+      scaledata <-
+        mclapply(1:length(datafiles),
+                 FUN=function(i) {
+                   getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
+                                      chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
+                                      chemvars=chemvars[[names(datafiles)[i]]],
+                                      CreatFun=creatinine,
+                                      bodywtfile=bwtfiles[names(datafiles)[i]],
+                                      creatfile=creatfiles[names(datafiles)[i]],
+                                      Q=c(50),
+                                      codes_table = convtbl,
+                                      code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
+                                                codename="NHANEScode",CAS="CAS",chemname="Name"),
+                                      LODfilter=FALSE,
+                                      MaximumAge=150)
+                 },
+                 mc.preschedule=FALSE, mc.cores = cores)
+    } else {
+      for (i in 1:length(datafiles)){
+        print(datafiles[i])
+        scaledata[[i]] <- getNhanesQuantiles(demof=demofiles[i], chemdtaf=datafiles[i],lognormfit=TRUE,
+                                             chem2yrwt=chemwt[paste(names(datafiles)[i], ".XPT", sep = "")],
+                                             chemvars=chemvars[[names(datafiles)[i]]],
+                                             CreatFun=creatinine,
+                                             bodywtfile=bwtfiles[names(datafiles)[i]],
+                                             creatfile=creatfiles[names(datafiles)[i]],
+                                             Q=c(50),
+                                             codes_table = convtbl,
+                                             code=list(table=convtbl[,c("Name","CAS","NHANEScode")],
+                                                                     codename="NHANEScode",CAS="CAS",chemname="Name"),
+                                             LODfilter=FALSE,
+                                             MaximumAge=150)
+     }
+    }
   }
 
   scalequants <- do.call("rbind", scaledata)

@@ -8,7 +8,8 @@ readNHANES(
   codes_file,
   data_path = NULL,
   cohort = "newest",
-  save_directory = "."
+  save_directory = ".",
+  cores = NULL
 )
 }
 \arguments{
@@ -27,6 +28,10 @@ cycle. Other options include "oldest", "all"}
 
 \item{save_directory}{String providing the directory in which to save the NHANES data files.  If left as the default,
 NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.}
+
+\item{cores}{Allows for the call to getNhanesQuantiles() to be run in parallel for the set of data files (if not
+combining cohorts) or set of metabolite codes (if combining cohort data). Default is NULL, which uses
+a traditional for loop.}
 }
 \value{
 Measured: a data frame containing a row for each metabolite with columns
