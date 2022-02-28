@@ -410,7 +410,7 @@ readNHANES <- function(codes_file, data_path = NULL, cohort = "newest", save_dir
   print(paste("Saving returned outputs as MCMCdata_", format(Sys.time(), "%Y-%m-%d"), ".RData", sep = ""))
   result <- list(Measured = Measured,
                  pred.data = pred.data,
-                 Uses = Uses,
+                 #Uses = Uses,
                  mapping = mapping)
   save(result, file = file.path(save_directory, paste("MCMCdata_", format(Sys.time(), "%Y-%m-%d"),
                                                       ".RData", sep = "")))

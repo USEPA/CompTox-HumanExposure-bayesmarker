@@ -4,7 +4,13 @@
 \alias{examine_error}
 \title{examine_error}
 \usage{
-examine_error(Measured, codes_file, data_path = ".", save_directory = ".")
+examine_error(
+  Measured,
+  codes_file,
+  data_path = ".",
+  save_directory = ".",
+  cores = NULL
+)
 }
 \arguments{
 \item{Measured}{A data frame containing a row for each metabolite with columns
@@ -22,6 +28,9 @@ in e.g. ./rawData/1999-2000.}
 
 \item{save_directory}{String giving the path of where to save the output table
 and plot.}
+
+\item{cores}{Allows for the call to doplots(), which is called by examine_error, to be run in parallel
+for each unique chemical in Measured. Default is NULL, which uses a traditional for loop.}
 }
 \value{
 Measured: same as the input, but with 4 additional columns.

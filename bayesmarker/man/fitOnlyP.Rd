@@ -10,7 +10,7 @@ fitOnlyP(
   mapping,
   pred.data,
   quick = FALSE,
-  cores = 3,
+  cores = NULL,
   save_directory = "."
 )
 }
