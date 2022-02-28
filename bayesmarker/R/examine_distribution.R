@@ -15,6 +15,8 @@
 #'                  in e.g. ./rawData/1999-2000.
 #' @param save_directory String giving the path of where to save the output table
 #'                  and plot.
+#' @param cores Allows for the call to doplots(), which is called by examine_error, to be run in parallel
+#'              for each unique chemical in Measured. Default is NULL, which uses a traditional for loop.
 #'
 #' @import survey
 #' @import ggplot2
@@ -36,7 +38,7 @@
 #'
 #'
 #'
-examine_error <- function(Measured, codes_file, data_path = ".", save_directory = ".") {
+examine_error <- function(Measured, codes_file, data_path = ".", save_directory = ".", cores = NULL) {
 
   nms <- unique(Measured$subpop)
 
@@ -93,7 +95,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
   convtbl <- as.data.frame(read_excel(NHANEScodes, sheet = 1))
   wtvars <- as.data.frame(read_excel(NHANEScodes, sheet = 2))
 
-  # Reduce these 2 tables to include cohorts only in Measured
+  # Reduce these 2 tables to include only the cohorts and files in Measured
   convtbl <- convtbl[convtbl$recent_sample %in% phases,]
   wtvars <- wtvars[wtvars$sample %in% phases,]
   demofiles <- wtvars$demofile
@@ -128,10 +130,10 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
       convtbl <- convtbl[!paste(convtbl$NHANESfile, ".XPT", sep = "") == wtvars$file[wtvars$wtvariable == ""],]
       wtvars <- wtvars[!wtvars$wtvariable == "",]
     }
-    tmp <- unique(convtbl[,c("recent_sample","NHANESfile")])
+    tmp <- unique(Measured[,c("recent_sample","NHANESfile")])
     # Only keep the phases in Measured
     tmp <- tmp[tmp$recent_sample %in% phases,]
-    wtvars <- wtvars[wtvars$sample %in% phases, ]
+    wtvars <- wtvars[wtvars$sample %in% phases,]
     # Obtain list of files
     datafiles <- file.path(datapaths[as.character(tmp$recent_sample)], paste(tolower(tmp$NHANESfile), ".xpt", sep = ""))
     names(datafiles) <- tmp$NHANESfile
@@ -144,8 +146,9 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
     creatfiles <- file.path(datapaths[as.character(tmp$recent_sample)],
                             tolower(wtvars$creatfile[match(paste(names(demofiles), ".XPT", sep = ""), wtvars$file)]))
     names(creatfiles) <- tmp$NHANESfile
-    chemwt <- wtvars$wtvariable
-    names(chemwt) <- tolower(gsub(".XPT", "", wtvars$file))
+    ind <- match(paste(tmp$NHANESfile, ".XPT", sep = ""), wtvars$file)
+    chemwt <- wtvars$wtvariable[ind]
+    names(chemwt) <- tolower(gsub(".XPT", "", wtvars$file[ind]))
   }
 
   # Check to see if any chemicals use units we haven't accounted for
@@ -164,12 +167,18 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
 
   J <- 1:nrow(Measured)
 
-  #outplots <- mclapply(J, doplots, dsgn=Measured, mc.preschedule=TRUE, mc.cores=11)
   print("Run doplots function for each chemical")
-  registerDoMC(cores = 10)
-  outplots <- foreach(i = J) %dopar% {
-    tmp <- doplots(i, dsgn = Measured, demofiles, datafiles, chemwt, bwtfiles, creatfiles, codes_table = convtbl)
-    return(tmp)
+  if (!is.null(cores)){
+    registerDoMC(cores = cores)
+    outplots <- foreach(i = J) %dopar% {
+      tmp <- doplots(i, dsgn = Measured, demofiles, datafiles, chemwt, bwtfiles, creatfiles, codes_table = convtbl)
+      return(tmp)
+    }
+  } else {
+    outplots <- list()
+    for (i in 1:J){
+      outplots[[i]] <- doplots(i, dsgn = Measured, demofiles, datafiles, chemwt, bwtfiles, creatfiles, codes_table = convtbl)
+    }
   }
 
   Rightseg <- sapply(outplots, function(z) z$Rightseg)

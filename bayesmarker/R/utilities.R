@@ -678,9 +678,9 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     ## ------------------------------ Gender ---------------------------------
     ## -----------------------------------------------------------------------
 
-    out2 <- svyby(formula=formla, by=~RIAGENDR, design, FUN=oldsvyquantile,
+    out2 <- suppressWarnings(svyby(formula=formla, by=~RIAGENDR, design, FUN=oldsvyquantile,
                   quantiles=Q, ci=TRUE,
-                  na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci")
+                  na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci"))
     if (lognormfit) {
       ## Fit lognormal
       ## xmean
@@ -768,8 +768,8 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     ## ----------------------------- Age -------------------------------------
     ## -----------------------------------------------------------------------
 
-    out3 <- svyby(formla, by=~AgeGroup, design, FUN=oldsvyquantile, quantiles=Q, ci=TRUE,
-                  na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci")
+    out3 <- suppressWarnings(svyby(formla, by=~AgeGroup, design, FUN=oldsvyquantile, quantiles=Q, ci=TRUE,
+                  na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci"))
     NAges <- nlevels(factor(out3$AgeGroup))
     if (lognormfit) {
       ## Fit lognormal
@@ -859,8 +859,8 @@ getNhanesQuantiles <- function(demof="DEMO_F.XPT", chemdtaf, measurehead="URX", 
     ## ---------------------------- Obesity ----------------------------------
     ## -----------------------------------------------------------------------
 
-    out4 <- svyby(formla, by=~Obesity, design, FUN=oldsvyquantile, quantiles=Q, ci=TRUE,
-                  na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci")
+    out4 <- suppressWarnings(svyby(formla, by=~Obesity, design, FUN=oldsvyquantile, quantiles=Q, ci=TRUE,
+                  na.rm=TRUE, interval.type="betaWald", ties="discrete", vartype="ci"))
     if (lognormfit) {
       ## Fit lognormal
       ## xmean

@@ -85,8 +85,8 @@ model
 #' @param mapping  Output from the readNHANES function, saved in MCMCdata file
 #' @param pred.data Output from the readNHANES function, saved in MCMCdata file
 #' @param quick Default is FALSE.  If TRUE, the calculations will be run
-#' with less iterations, resulting in a shorter overall runtime, however,
-#' model convergence may not be reached.  Check convergence using the fromMolar function.
+#'              with less iterations, resulting in a shorter overall runtime, however,
+#'              model convergence may not be reached.  Check convergence using the fromMolar function.
 #' @param cores Number of cores to use during computation
 #' @param save_directory String providing the directory in which to save the results.  If
 #'                       left as the default, ".", it will save to ./OnlyPparms3_SUBPOP.RData
@@ -111,7 +111,7 @@ model
 #' @export
 #'
 #'
-fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores = 3, save_directory = ".") {
+fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores = NULL, save_directory = ".") {
 
   system(paste("echo 'now processing:",SUBPOP,"'"))
 
@@ -518,32 +518,31 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
   }
 
   #ly <- nhanesdata$ly
-  save(Indx, nhanesdata, out.coda, inits2, file = file.path(save_directory, paste("Inits_", SUBPOP, "_",
-                                format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
+  #save(Indx, nhanesdata, out.coda, inits2, file = file.path(save_directory, paste("Inits_", SUBPOP, "_",
+   #                             format(Sys.time(), "%Y-%m-%d"), ".RData", sep = "")))
+
   print("Start main computation")
-  registerDoMC(cores = cores)
-  #cl <- makeCluster(cores, type = "SOCK")
-  #registerDoParallel(cl)
-  #clusterEvalQ(cl, rm(list = ls()))
-  #clusterExport(cl, library(rjags), envir = environment())
-  #clusterExport(cl, "bayes_model", envir = environment())
-  clength <- 1:cores
-  out.samps3R <- foreach(iter = clength) %dopar% {
-    model <- jags.model(textConnection(bayes_model), data=nhanesdata,
-                        inits=inits2[iter], n.chains=1, n.adapt=NBurnin)
-    result <- coda.samples(model, variable.names=c("lP","phi","lU","lPmu","sd.V"),
-                           n.iter=NIters*Thin, thin=Thin)
-    return(result)
+
+  if (!is.null(cores)){
+    registerDoMC(cores = cores)
+    clength <- 1:cores
+    out.samps3R <- foreach(iter = clength) %dopar% {
+      model <- jags.model(textConnection(bayes_model), data=nhanesdata,
+                          inits=inits2[iter], n.chains=1, n.adapt=NBurnin)
+      result <- coda.samples(model, variable.names=c("lP","phi","lU","lPmu","sd.V"),
+                             n.iter=NIters*Thin, thin=Thin)
+      return(result)
+    }
+  } else {
+    out.samps3R <- c()
+    for (i in 1:3){
+      print(paste("Running initial condition number ", i, sep = ""))
+      model <- jags.model(textConnection(bayes_model), data=nhanesdata,
+                          inits=inits2[i], n.chains=1, n.adapt=NBurnin)
+      out.samps3R[[i]] <- coda.samples(model, variable.names=c("lP","phi","lU","lPmu","sd.V"),
+                             n.iter=NIters*Thin, thin=Thin)
+    }
   }
-  #stopCluster(cl)
-  #out.samps3R <- c()
-  #for (i in 1:3){
-  #  print(paste("Running initial condition number ", i, sep = ""))
-  #  model <- jags.model(textConnection(bayes_model), data=nhanesdata,
-  #                      inits=inits2[i], n.chains=1, n.adapt=NBurnin)
-  #  out.samps3R[[i]] <- coda.samples(model, variable.names=c("lP","phi","lU","lPmu","sd.V"),
-  #                         n.iter=NIters*Thin, thin=Thin)
-  #}
 
   out.coda3R <- do.call("mcmc.list", lapply(out.samps3R, function(z) z[[1]]))
 
