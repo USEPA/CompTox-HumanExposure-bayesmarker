@@ -33,7 +33,7 @@ allow the identification of public health priority chemicals via risk-based bioa
 * Getting Started with R Package bayesmarker from the R command line
 ``` 
 library(devtools)
-install_github("USEPA/CompTox-HumanExposure-bayesmarker")
+install_github("USEPA/CompTox-HumanExposure-bayesmarker/bayesmarker")
 ```
 * RStudio provides a menu ‘Install Packages’ under ‘Tools’ tab
 * Load the bayesmarker data and functions
