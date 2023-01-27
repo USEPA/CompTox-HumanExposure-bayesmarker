@@ -92,7 +92,6 @@ model
 #'                       left as the default, ".", it will save to ./OnlyPparms3_SUBPOP.RData
 #'                       with a date stamp.  Otherwise, it will save to save_directory.
 #'
-#' @import doMC
 #' @import foreach
 #' @import rjags
 #' @import random
@@ -524,7 +523,7 @@ fitOnlyP <- function(SUBPOP, Measured, mapping, pred.data, quick = FALSE, cores 
   print("Start main computation")
 
   if (!is.null(cores)){
-    registerDoMC(cores = cores)
+    registerDoParallel(cores = cores)
     clength <- 1:cores
     out.samps3R <- foreach(iter = clength) %dopar% {
       model <- jags.model(textConnection(bayes_model), data=nhanesdata,

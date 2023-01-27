@@ -17,9 +17,6 @@ of length 5 representing the shortened dates for the cohort. For example "15-16"
 \item{save_directory}{String providing the directory in which to save the NHANES data files.  If left as the default,
 NULL, it will save to ./rawData.  Otherwise, it will save to save_directory/rawData.}
 }
-\value{
-
-}
 \description{
 Downloads NHANES data files needed for exposure inference based on a manually curated file describing which data to use.
 Note that accuracy is very important for the input codes file. After "Starting Downloads" is printed to the console by
@@ -28,8 +25,4 @@ spelling of the file names (e.g. dem.xtpt instead of demo.xpt) and having the wr
 \itemize{
 \item 2016 files end in "_I.XPT"; will fail if this is "_F.XPT").
 }
-}
-\examples{
-
-
 }

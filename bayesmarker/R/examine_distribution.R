@@ -25,7 +25,7 @@
 #' @importFrom parallel mclapply
 #' @importFrom stats vcov
 #' @importFrom readxl read_excel
-#' @importFrom doMC registerDoMC
+#' @importFrom doParallel registerDoParallel
 #'
 #' @return Measured: same as the input, but with 4 additional columns.
 #'                   1. Prabove: fraction of measurements above the LOD.
@@ -169,7 +169,7 @@ examine_error <- function(Measured, codes_file, data_path = ".", save_directory 
 
   print("Run doplots function for each chemical")
   if (!is.null(cores)){
-    registerDoMC(cores = cores)
+    registerDoParallel(cores = cores)
     outplots <- foreach(i = J) %dopar% {
       tmp <- doplots(i, dsgn = Measured, demofiles, datafiles, chemwt, bwtfiles, creatfiles, codes_table = convtbl)
       return(tmp)

@@ -29,7 +29,19 @@ allow the identification of public health priority chemicals via risk-based bioa
 * Users will likely want a development environment like RStudio: <https://www.rstudio.com/products/rstudio/download/>
 
 ### Installing
+* Installing JAGS and rjags
+JAGS ("Just Another Gibbs Sampler") is a separate program from R, and is needed for MCMC
+JAGS can be installed from: https://mcmc-jags.sourceforge.io/
+NOTE: IF you are using Windows you must use JAGS v4.3.1 if your version of R is >= 4.2.0, but you must use JAGS v4.3.0 if your version of R is < 4.2.0.
 
+If you install JAGS in a place other than it's defaault, set the JAGS_HOME variable within R:
+```
+Sys.setenv(JAGS_HOME="C:/Users/jwambaug/AppData/Local/JAGS/JAGS-4.3.0/")
+```
+Then install the package "rjags":
+```
+install.packages("rjags")
+```
 * Getting Started with R Package bayesmarker from the R command line
 ``` 
 library(devtools)
