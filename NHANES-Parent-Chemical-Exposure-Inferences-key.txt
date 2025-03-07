@@ -1,0 +1,26 @@
+The Centers for Disease Control and Prevention (CDC) National Health and 
+Nutrition Examination Survey (NHANES) is a program designed to assess the 
+health and nutritional status of adults and children in the United States 
+(https://www.cdc.gov/nchs/nhanes/index.html). As part of the NHANES, the CDC 
+monitors biomarkers of chemical exposure 
+(chiefly metabolites) in blood and urine to quantify the levels of chemical 
+compounds present in U.S. residents 
+(https://www.cdc.gov/biomonitoring/resources/national-exposure-report.html). 
+Each two-year study cycle comprises 
+approximately 10,000 individuals, with exposure biomarker data for any given 
+chemical available from only a subset of roughly 1/3 of the individuals in the 
+study. In the 2024 publication “Characterizing Chemical Exposure Trends from 
+NHANES Urinary Biomonitoring Data” (https://doi.org/10.1289/ehp12188) EPA 
+scientists inferred steady-state 
+daily intake rates (mg/kg bodyweight/day) for 179 chemicals from the NHANES 
+urine samples. All values in the table refer to the median U.S. population 
+intake rate – the credible intervals reflect the uncertainty in the median 
+estimate and do not characterize variability.
+
+Column Descriptions for NHANES-Parent-Chemical-Exposure-Inferences-[DATE].txt
+DTXSID: DSSTox Structure Identifier
+Demographic_Group: Demographic group characterized
+IntakeRate_mgpkgpday: Median value for estimated median intake rate (mg/kg/day)
+Low95: Lower 95th percentile value for estimated median intake rate
+Up95: Upper 95th percentile value for estimated median intake rate
+NHANES_Cohort: Two-year cohort of NHANES volunteers on which estimate is based
